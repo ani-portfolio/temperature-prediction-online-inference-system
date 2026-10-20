@@ -2,12 +2,12 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-problem-framing
 stage: framing
-saved_at: '2026-10-20T13:54:52'
+saved_at: '2026-10-20T13:55:19'
 command:
   - make_notebook.py
   - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/framing.yaml
 answers:
-  status: draft
+  status: confirmed
   framing:
     task_type: forecasting
     target:

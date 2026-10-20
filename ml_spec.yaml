@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:54:52'
+  updated: '2026-10-20T13:55:19'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -182,7 +182,7 @@ discovery:
     history_days: 1004
     post_outcome_suspects: []
 framing:
-  status: draft
+  status: confirmed
   task_type: forecasting
   target:
     name: temperature_2m_max
@@ -250,8 +250,8 @@ notebooks:
     run_at: '2026-10-20T13:39:35'
   framing:
     path: notebooks/03_problem_framing.ipynb
-    decisions_hash: 7a6ada35600c5ffc
-    run_at: '2026-10-20T13:54:52'
+    decisions_hash: 43a689ce19508ce6
+    run_at: '2026-10-20T13:55:19'
 split: {}
 features: {}
 baseline: {}
@@ -339,6 +339,15 @@ history:
     skill: ml-problem-framing
     action: wrote data from its notebook
   - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T13:55:19'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T13:55:19'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T13:55:19'
     skill: ml-problem-framing
     action: ran 03_problem_framing.ipynb
 version:
