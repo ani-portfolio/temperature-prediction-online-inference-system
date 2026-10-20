@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T14:31:05'
+  updated: '2026-10-20T17:11:51'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -500,6 +500,10 @@ notebooks:
     path: notebooks/07_baseline.ipynb
     decisions_hash: 823dda73a2257506
     run_at: '2026-10-20T14:31:05'
+  training:
+    path: notebooks/08_training.ipynb
+    decisions_hash: 5b6d000bcc06b6b4
+    run_at: '2026-10-20T17:11:51'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -995,7 +999,141 @@ baseline:
     experiment_id: '5'
     url: http://127.0.0.1:5000/#/experiments/5/runs/d940e47e7db1428b8c31ba8725be60ea
     logged_at: '2026-10-20T14:31:06'
-training: {}
+training:
+  models:
+    - name: ridge
+      type: ridge
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: 'The simple model first: it shows whether the lag, calendar, and location features beat persistence
+        without any complexity, and it is easy to explain.'
+    - name: lightgbm
+      type: lightgbm
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: Gradient boosting can learn interactions such as latitude with day of year, where seasons flip between
+        hemispheres.
+  settings:
+    seed: 42
+    selection: best_mean
+  data_version: 03f76d78ab4a
+  primary_label: mae
+  leaderboard:
+    - model: lightgbm
+      type: lightgbm
+      primary_mean: 2.163048
+      primary_std: 0.23589
+      trials: 20.0
+      minutes: 10.4
+      kind: ml
+      vs reference %: 14.0
+    - model: ridge
+      type: ridge
+      primary_mean: 2.230134
+      primary_std: 0.250676
+      trials: 20.0
+      minutes: 0.1
+      kind: ml
+      vs reference %: 11.3
+    - model: naive
+      type: non ML
+      primary_mean: 2.515648
+      primary_std: 0.268585
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: 0.0
+    - model: moving_average
+      type: non ML
+      primary_mean: 2.774013
+      primary_std: 0.313272
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: -10.3
+    - model: seasonal_naive
+      type: non ML
+      primary_mean: 3.327011
+      primary_std: 0.523032
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: -32.3
+  champion:
+    name: lightgbm
+    type: lightgbm
+    params:
+      colsample_bytree: 0.881961
+      learning_rate: 0.012874
+      min_child_samples: 88
+      n_estimators: 700
+      num_leaves: 40
+      reg_lambda: 0.004712
+      subsample: 0.533786
+      subsample_freq: 1
+    class_weight: null
+    inputs: null
+    run_id: 3e1d937d9c18-12
+    mae: 2.163048
+    std: 0.23589
+    vs_reference_pct: 14.0
+    beats_best_baseline: true
+    v1_bar_met: true
+    v1:
+      'on': cv
+      status: met
+      criteria:
+        - id: beats_best_baseline_cv
+          kind: pct_over_reference
+          status: pass
+          detail: +14.0% against naive, needs 10%.
+        - id: beats_best_baseline_test
+          kind: pct_over_reference
+          status: pass
+          detail: +14.0% against naive, needs 0%.
+    path: models/champion_lightgbm.joblib
+    serialization: cloudpickle_by_value
+  top_features:
+    - feature: temperature_2m_max_lag_2d
+      importance: 2.00091
+    - feature: temperature_2m_max_roll_7d_mean_shift_2d
+      importance: 1.90414
+    - feature: temperature_2m_max_roll_28d_mean_shift_2d
+      importance: 0.93015
+    - feature: shortwave_radiation_sum_lag_2d
+      importance: 0.18567
+    - feature: apparent_temperature_max_lag_2d
+      importance: 0.12772
+    - feature: temperature_2m_max_lag_364d
+      importance: 0.08384
+    - feature: temperature_2m_mean_lag_2d
+      importance: 0.08303
+    - feature: latitude
+      importance: 0.07385
+    - feature: temperature_2m_max_lag_7d
+      importance: 0.06303
+    - feature: apparent_temperature_min_lag_2d
+      importance: 0.045
+  files:
+    runs: data/processed/training_runs.parquet
+    oof_predictions: data/processed/training_oof_predictions.parquet
+    champion_model: models/champion_lightgbm.joblib
+  checks:
+    problems: []
+    train_score: 1.891419
+    cv_score: 2.163048
+  run_at: '2026-10-20T17:11:51'
+  mlflow:
+    run_id: 4f1b50b1fea945eab1179586be8b832a
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/4f1b50b1fea945eab1179586be8b832a
+    logged_at: '2026-10-20T17:11:53'
 evaluation: {}
 system: {}
 iterations:
@@ -1081,6 +1219,10 @@ decisions:
     decision: Baselines are persistence (lag 2), seasonal naive (lag 364), and a 28 day moving average; the reference
       is the best of them.
     reason: The project is exploratory, with no current approach; the user chose these three.
+  - date: '2026-10-20'
+    stage: training
+    decision: Build ridge and LightGBM with quick tuning (20 trials each).
+    reason: The user chose them; a simple and a complex model, compared on the same folds.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -1169,6 +1311,12 @@ history:
   - at: '2026-10-20T14:31:05'
     skill: ml-baseline-model
     action: ran 07_baseline.ipynb
+  - at: '2026-10-20T17:11:51'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:11:51'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
 version:
   current: V1
   branch: ml/v1
