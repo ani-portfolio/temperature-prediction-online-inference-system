@@ -1,0 +1,13 @@
+# Settings the discovery notebook was last built from, written by ml-data-discovery. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-data-discovery
+stage: discovery
+saved_at: '2026-10-20T13:38:51'
+command:
+  - discover.py
+  - data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - --names
+  - weather
+  - --main
+  - weather
+answers: null

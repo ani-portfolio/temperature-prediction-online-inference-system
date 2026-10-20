@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T12:22:48'
+  updated: '2026-10-20T13:38:51'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -54,7 +54,127 @@ business:
     - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
         monitoring no quality bar.
       resolution: The learning question now includes beating a persistence forecast.
-discovery: {}
+discovery:
+  run_at: '2026-10-20T13:38:51'
+  notebook: notebooks/02_data_discovery.ipynb
+  dictionary: docs/data_dictionary.yaml
+  main_source: weather
+  sources:
+    - name: weather
+      path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+      description: null
+      rows: 50250
+      columns: 23
+      duplicate_rows: 0
+      grain:
+        type: pair
+        columns:
+          - date
+          - city
+        other_unique_pairs: []
+      entity_id_candidates: []
+      date_columns:
+        - column: date
+          min: '2024-01-01'
+          max: '2026-10-01'
+          span_days: 1004
+          missing_pct: 0.0
+      main_date: date
+      history_days: 1004
+      days_since_last_date: 19
+      months_with_no_rows: []
+      thin_months:
+        - 2026-10
+      issues:
+        - severity: Medium
+          finding: Dates stored as text
+          count: 1
+        - severity: Low
+          finding: Highly correlated numeric pairs (|Spearman| ≥ 0.9)
+          count: 14
+        - severity: Low
+          finding: Highly skewed (absolute skew above 2)
+          count: 4
+        - severity: Low
+          finding: Many outliers (over 5% of rows by the IQR rule)
+          count: 4
+        - severity: Low
+          finding: Strongly associated categorical pairs (Cramér's V ≥ 0.8)
+          count: 3
+      issue_counts:
+        Medium: 1
+        Low: 4
+  joins: []
+  dictionary_summary:
+    columns: 23
+    needs_review: 11
+    unclear_meaning: []
+    timing_unknown:
+      - weather.latitude
+      - weather.longitude
+      - weather.grid_latitude
+      - weather.grid_longitude
+      - weather.elevation
+      - weather.timezone
+      - weather.sunshine_duration
+      - weather.weather_code
+    possibly_after_outcome: []
+    candidate_targets:
+      - weather.wind_speed_10m_max
+      - weather.wind_gusts_10m_max
+      - weather.wind_direction_10m_dominant
+    personal_data: []
+  framing_hints:
+    candidate_targets:
+      - column: wind_speed_10m_max
+        suggested_type: continuous
+        unique: 511
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_gusts_10m_max
+        suggested_type: continuous
+        unique: 295
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_direction_10m_dominant
+        suggested_type: continuous
+        unique: 361
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: city
+        suggested_type: categorical
+        unique: 50
+        missing_pct: 0.0
+        reasons:
+          - first column
+      - column: weather_code
+        suggested_type: categorical
+        unique: 13
+        missing_pct: 0.0
+        reasons:
+          - last column
+    grain:
+      type: pair
+      columns:
+        - date
+        - city
+      other_unique_pairs: []
+    entity_id_candidates: []
+    date_columns:
+      - column: date
+        min: '2024-01-01'
+        max: '2026-10-01'
+        span_days: 1004
+        missing_pct: 0.0
+    main_date: date
+    history_days: 1004
+    post_outcome_suspects: []
 framing:
   status: not_started
   task_type: null
@@ -82,7 +202,12 @@ framing:
     v1_criteria: []
     guardrails: []
 data:
-  sources: []
+  sources:
+    - name: weather
+      path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+      rows: 50250
+      columns: 23
+      description: null
   date_col: null
   id_cols: []
   excluded_cols: []
@@ -92,11 +217,16 @@ notebooks:
     path: notebooks/01_business_framing.ipynb
     decisions_hash: 2d7f0cb0b0a305cf
     run_at: '2026-10-20T12:22:48'
+  discovery:
+    path: notebooks/02_data_discovery.ipynb
+    decisions_hash: dd2e4cac03ab0887
+    run_at: '2026-10-20T13:38:51'
 split: {}
 features: {}
 baseline: {}
 training: {}
 evaluation: {}
+system: {}
 iterations:
   current: null
   entries: []
@@ -125,6 +255,12 @@ history:
   - at: '2026-10-20T12:22:48'
     skill: ml-business-framing
     action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T13:38:51'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T13:38:51'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
 version:
   current: V1
   branch: ml/v1

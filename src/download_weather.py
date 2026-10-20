@@ -139,8 +139,9 @@ def to_frame(city, payload):
     return frame
 
 
-def download(start, end):
-    """Fetch one city per request, caching each response so an interrupted run resumes."""
+def download(start, end, cached_only=False):
+    """Fetch one city per request, caching each response so an interrupted run resumes. With cached_only, use only
+    the cities already in the cache and make no requests."""
     cache = CACHE_DIR / f"{start}_{end}"
     cache.mkdir(parents=True, exist_ok=True)
     frames, urls = [], []
@@ -148,6 +149,8 @@ def download(start, end):
         url = build_url([city], start, end)
         path = cache / f"{city[0].replace(' ', '_').lower()}.json"
         if not path.exists():
+            if cached_only:
+                continue
             path.write_text(json.dumps(fetch_json(url)))
             print(f"Downloaded {city[0]}", flush=True)
             time.sleep(SECONDS_BETWEEN_CITIES)
@@ -160,9 +163,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", default="2024-01-01")
     parser.add_argument("--end", default="2026-10-01")
+    parser.add_argument("--cached-only", action="store_true", help="build the table from cached cities only")
     args = parser.parse_args()
 
-    df, urls = download(args.start, args.end)
+    df, urls = download(args.start, args.end, cached_only=args.cached_only)
     stem = f"open_meteo_daily_{args.start}_{args.end}"
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(RAW_DIR / f"{stem}.csv", index=False)
@@ -174,7 +178,8 @@ def main():
         "daily_variables": DAILY_VARIABLES,
         "units": {"temperature": "celsius", "precipitation": "mm", "snowfall": "cm", "wind": "km/h",
                   "shortwave_radiation_sum": "MJ/m2", "sunshine_duration": "seconds"},
-        "n_cities": len(CITIES),
+        "n_cities": int(df["city"].nunique()),
+        "cities_missing": sorted({c[0] for c in CITIES} - set(df["city"])),
         "n_rows": len(df),
         "request_urls": urls,
     }
