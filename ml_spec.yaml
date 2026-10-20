@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T17:32:03'
+  updated: '2026-10-20T17:33:32'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -506,8 +506,8 @@ notebooks:
     run_at: '2026-10-20T17:15:38'
   evaluation:
     path: notebooks/09_evaluation.ipynb
-    decisions_hash: 345f5beeca61d783
-    run_at: '2026-10-20T17:32:03'
+    decisions_hash: 691949232f8b69a8
+    run_at: '2026-10-20T17:33:32'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -1977,13 +1977,16 @@ evaluation:
     - at: '2026-10-20T17:32:02'
       champion: lightgbm
       data_version: 03f76d78ab4a
+    - at: '2026-10-20T17:33:32'
+      champion: lightgbm
+      data_version: 03f76d78ab4a
   decision: null
-  run_at: '2026-10-20T17:32:02'
+  run_at: '2026-10-20T17:33:32'
   mlflow:
-    run_id: d3bc59aa6a1d42dd891ac26559d3fefe
+    run_id: 6d822e54fefa4f1ebf0e88a0872721a7
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/d3bc59aa6a1d42dd891ac26559d3fefe
-    logged_at: '2026-10-20T17:32:04'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/6d822e54fefa4f1ebf0e88a0872721a7
+    logged_at: '2026-10-20T17:33:33'
 system: {}
 iterations:
   current: null
@@ -2072,6 +2075,12 @@ decisions:
     stage: training
     decision: Build ridge and LightGBM with quick tuning (20 trials each).
     reason: The user chose them; a simple and a complex model, compared on the same folds.
+  - date: '2026-10-20'
+    stage: evaluation
+    decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it.'
+    reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
+      on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over
+      26 weeks. This matches the answer action for beating persistence by 10% or more.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2182,6 +2191,12 @@ history:
     skill: ml-offline-evaluation
     action: wrote evaluation from its notebook
   - at: '2026-10-20T17:32:03'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T17:33:32'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-20T17:33:32'
     skill: ml-offline-evaluation
     action: ran 09_evaluation.ipynb
 version:

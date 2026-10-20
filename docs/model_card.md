@@ -29,6 +29,8 @@ There is no current approach, so the champion is compared with the best simple b
 
 ## Results on the Test Set
 
+**The test set has been opened 2 times.** Scores after the first look are optimistic, because earlier test results shaped the changes since.
+
 Primary metric: mae. Intervals are 95% bootstrap intervals, resampling whole date values.
 
 | Model | Kind | Test | 95% interval | CV |
@@ -91,5 +93,5 @@ Paired bootstrap differences; positive is better, also for error metrics.
 
 ## Decision
 
-Not recorded yet. The evidence above is for the model owner to decide go, iterate, or no go; record the decision with its reason in the decisions cell of the evaluation notebook.
-<!-- written by ml-offline-evaluation. If you edit this card, the next run keeps it and writes model_card_new.md: 676fd9e1efa9cc49 -->
+* 2026-10-20: Go: promote lightgbm as the V1 champion and build the serving stack around it. It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over 26 weeks. This matches the answer action for beating persistence by 10% or more.
+<!-- written by ml-offline-evaluation. If you edit this card, the next run keeps it and writes model_card_new.md: 217278f18c1af125 -->
