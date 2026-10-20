@@ -29,3 +29,16 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast tests of one function, no network or disk outside tmp_path",
+    "component: tests of one part of the system (feature store, model registry, API) with its real dependencies",
+    "system: end to end tests of the running system, from raw data to a served prediction",
+]
