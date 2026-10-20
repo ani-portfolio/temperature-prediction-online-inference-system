@@ -1,0 +1,51 @@
+# Settings the baseline notebook was last built from, written by ml-baseline-model. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-baseline-model
+stage: baseline
+saved_at: '2026-10-20T14:31:07'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/baseline.yaml
+answers:
+  metrics:
+    primary:
+      key: mae
+    secondary:
+      - rmse
+      - bias
+  baselines:
+    - name: naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_2d
+      reason: 'Persistence: tomorrow equals the last complete day''s maximum, 2 days before the target date. The
+        baseline the learning question names.'
+    - name: seasonal_naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_364d
+      reason: The maximum on the same date last year (lag 364 days), the seasonal anchor.
+    - name: moving_average
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_roll_28d_mean_shift_2d
+      reason: The mean maximum over the 28 days ending on the last complete day.
+  reference: null
+  reasoning:
+    metrics: MAE in degrees is the framing's primary metric. RMSE shows the cost of large misses and bias shows
+      whether a baseline runs warm or cold. WAPE was left out because a percentage error is hard to read for temperatures
+      near or below zero.
+    baselines: The project is exploratory and has no current approach, so there is no rule baseline. Persistence
+      is what the learning question names; the seasonal naive and the 28 day moving average are the other simple
+      forecasts. The reference is the best of the three, which the V1 bar is measured against.
+  risks: []
+  assumptions: []
+  open_questions: []
+  decisions:
+    - decision: Baselines are persistence (lag 2), seasonal naive (lag 364), and a 28 day moving average; the reference
+        is the best of them.
+      reason: The project is exploratory, with no current approach; the user chose these three.
+  resolved_questions: []

@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T14:26:28'
+  updated: '2026-10-20T14:31:05'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -496,6 +496,10 @@ notebooks:
     path: notebooks/06_features.ipynb
     decisions_hash: d1974a0238859849
     run_at: '2026-10-20T14:26:28'
+  baseline:
+    path: notebooks/07_baseline.ipynb
+    decisions_hash: 823dda73a2257506
+    run_at: '2026-10-20T14:31:05'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -923,7 +927,74 @@ features:
     experiment_id: '5'
     url: http://127.0.0.1:5000/#/experiments/5/runs/fe333b7d881e492dac39bb347b58242e
     logged_at: '2026-10-20T14:26:29'
-baseline: {}
+baseline:
+  metrics:
+    primary:
+      key: mae
+    secondary:
+      - rmse
+      - bias
+  primary_label: mae
+  models:
+    - name: naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_2d
+      reason: 'Persistence: tomorrow equals the last complete day''s maximum, 2 days before the target date. The
+        baseline the learning question names.'
+    - name: seasonal_naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_364d
+      reason: The maximum on the same date last year (lag 364 days), the seasonal anchor.
+    - name: moving_average
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_roll_28d_mean_shift_2d
+      reason: The mean maximum over the 28 days ending on the last complete day.
+  results:
+    - model: naive
+      kind: non_ml
+      type: column
+      mae: 2.5156
+      rmse: 3.544
+      bias: 0.0051
+      mae std: 0.2686
+    - model: moving_average
+      kind: non_ml
+      type: column
+      mae: 2.774
+      rmse: 3.7704
+      bias: 0.0212
+      mae std: 0.3133
+    - model: seasonal_naive
+      kind: non_ml
+      type: column
+      mae: 3.327
+      rmse: 4.5368
+      bias: 0.0484
+      mae std: 0.523
+  reference:
+    name: naive
+    mae: 2.5156
+  best_non_ml:
+    name: naive
+    mae: 2.5156
+  best_vs_reference_pct: null
+  files:
+    cv_results: data/processed/baseline_cv_results.parquet
+    oof_predictions: data/processed/baseline_oof_predictions.parquet
+  checks:
+    problems: []
+  run_at: '2026-10-20T14:31:05'
+  mlflow:
+    run_id: d940e47e7db1428b8c31ba8725be60ea
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/d940e47e7db1428b8c31ba8725be60ea
+    logged_at: '2026-10-20T14:31:06'
 training: {}
 evaluation: {}
 system: {}
@@ -1005,6 +1076,11 @@ decisions:
       temperature_2m_mean and apparent_temperature_max, despite associations above 0.9.'
     reason: Each ends at least 2 days before the target date (min_shift_days = 2, enforced by the feature code);
       temperature is persistent, so a high association is expected. Lag 2 is the persistence forecast itself.
+  - date: '2026-10-20'
+    stage: baseline
+    decision: Baselines are persistence (lag 2), seasonal naive (lag 364), and a 28 day moving average; the reference
+      is the best of them.
+    reason: The project is exploratory, with no current approach; the user chose these three.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -1087,6 +1163,12 @@ history:
   - at: '2026-10-20T14:26:28'
     skill: ml-feature-engineering
     action: ran 06_features.ipynb
+  - at: '2026-10-20T14:31:05'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-20T14:31:05'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
 version:
   current: V1
   branch: ml/v1
