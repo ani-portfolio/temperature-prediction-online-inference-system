@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T12:01:03'
+  updated: '2026-10-20T12:22:48'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -19,10 +19,19 @@ paths:
   models: models
   docs: docs
 business:
-  status: not_started
-  mode: null
-  learning_question: null
-  answer_actions: []
+  status: draft
+  mode: exploratory
+  learning_question: Can I build an end to end online inference system (feature store, champion/challenger gate,
+    monitoring) that serves next day maximum temperature forecasts for 50 cities, with a model that beats a simple
+    persistence forecast (tomorrow's maximum equals today's maximum)?
+  answer_actions:
+    - answer: The model clearly beats persistence (for example 10% or more lower error).
+      action: Promote it as champion, build the full serving stack around it, and use the gate to judge later challengers.
+    - answer: The model only matches persistence.
+      action: Still build the system, but serve the persistence forecast as the first champion, then try richer
+        features (lags from nearby cities, hourly data) as challengers.
+    - answer: The model is worse than persistence.
+      action: Look for leakage or a flawed setup first, and ship nothing until it is explained.
   business_goal: null
   business_kpi: null
   decision_supported: null
@@ -41,7 +50,10 @@ business:
     data_access: null
     other: []
   out_of_scope: []
-  risks: []
+  risks:
+    - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
+        monitoring no quality bar.
+      resolution: The learning question now includes beating a persistence forecast.
 discovery: {}
 framing:
   status: not_started
@@ -75,7 +87,11 @@ data:
   id_cols: []
   excluded_cols: []
 eda: {}
-notebooks: {}
+notebooks:
+  business:
+    path: notebooks/01_business_framing.ipynb
+    decisions_hash: 2d7f0cb0b0a305cf
+    run_at: '2026-10-20T12:22:48'
 split: {}
 features: {}
 baseline: {}
@@ -85,9 +101,14 @@ iterations:
   current: null
   entries: []
 autopilot: {}
-assumptions: []
+assumptions:
+  - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
 open_questions: []
-decisions: []
+decisions:
+  - date: '2026-10-20'
+    stage: business
+    decision: Predict the daily maximum temperature one day ahead, not minimum or mean, and not 1 to 7 days.
+    reason: The user chose it to keep V1 focused on building the system end to end.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -98,6 +119,12 @@ history:
   - at: '2026-10-20T12:01:03'
     skill: ml-project-setup
     action: 'tracking: experiment ml/16-weather-prediction on http://127.0.0.1:5000'
+  - at: '2026-10-20T12:22:48'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T12:22:48'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
 version:
   current: V1
   branch: ml/v1

@@ -1,0 +1,53 @@
+# Settings the business notebook was last built from, written by ml-business-framing. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-business-framing
+stage: business
+saved_at: '2026-10-20T12:22:48'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/business_anchors.yaml
+answers:
+  status: draft
+  business:
+    mode: exploratory
+    learning_question: Can I build an end to end online inference system (feature store, champion/challenger gate,
+      monitoring) that serves next day maximum temperature forecasts for 50 cities, with a model that beats a simple
+      persistence forecast (tomorrow's maximum equals today's maximum)?
+    answer_actions:
+      - answer: The model clearly beats persistence (for example 10% or more lower error).
+        action: Promote it as champion, build the full serving stack around it, and use the gate to judge later
+          challengers.
+      - answer: The model only matches persistence.
+        action: Still build the system, but serve the persistence forecast as the first champion, then try richer
+          features (lags from nearby cities, hourly data) as challengers.
+      - answer: The model is worse than persistence.
+        action: Look for leakage or a flawed setup first, and ship nothing until it is explained.
+    users: null
+    outcome: null
+    output_use: null
+    v1_bar_intent: null
+    ml_needed: null
+    ml_needed_reason: null
+    constraints:
+      latency: null
+      interpretability: null
+      fairness: null
+      data_access: null
+      other: []
+    out_of_scope: []
+  reasoning:
+    mode: This is a portfolio project with no business owner or KPI behind it, so it is framed as an experiment.
+    learning: The user's main goal is to build the serving system end to end (feature store, champion/challenger
+      gate, monitoring). That alone gives the modelling stages nothing to measure, so the learning question also
+      asks whether the model beats persistence, which the gate and the monitoring can judge against. The target
+      is the daily maximum temperature, one day ahead only. Each answer leads to a different action.
+  risks:
+    - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
+        monitoring no quality bar.
+      resolution: The learning question now includes beating a persistence forecast.
+  assumptions:
+    - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
+  open_questions: []
+  decisions:
+    - decision: Predict the daily maximum temperature one day ahead, not minimum or mean, and not 1 to 7 days.
+      reason: The user chose it to keep V1 focused on building the system end to end.
