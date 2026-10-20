@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:48:36'
+  updated: '2026-10-20T13:54:52'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -182,31 +182,50 @@ discovery:
     history_days: 1004
     post_outcome_suspects: []
 framing:
-  status: not_started
-  task_type: null
+  status: draft
+  task_type: forecasting
   target:
-    name: null
-    definition: null
+    name: temperature_2m_max
+    definition: The city's maximum air temperature at 2 m (degrees Celsius) on the target date, its local calendar
+      day.
     positive_class: null
-    outcome_window: null
-    exists_in_data: null
+    outcome_window: The single target day, two days after the last day the inputs may use
+    exists_in_data: true
     construction: null
-    label_delay: null
-  unit_of_prediction: null
-  entity_id_cols: []
-  population: null
+    label_delay: 1 day (known once the target day is complete and in the archive)
+  unit_of_prediction: One city on one target date (the city's next local day, seen from a request)
+  entity_id_cols:
+    - city
+  population: All 50 cities in the snapshot, every day
   prediction_time:
-    description: null
-    column: null
-    feature_cutoff: null
-    cadence: null
-    horizon: null
+    description: Whenever a request arrives during the day before the target date. The current day is incomplete,
+      so inputs stop at the last complete day, two days before the target date.
+    column: date
+    feature_cutoff: End of the local day two days before the target date (the last complete day)
+    cadence: Online, on request
+    horizon: 2 days
   success:
-    primary_metric: null
-    secondary_metrics: []
-    v1_bar: null
-    v1_criteria: []
+    primary_metric: MAE
+    secondary_metrics:
+      - RMSE
+      - mean error (bias)
+    v1_bar: MAE at least 10% lower than the best simple baseline (persistence, seasonal naive, or moving average)
+      on CV, and still lower than it on the test set
+    v1_criteria:
+      - id: beats_best_baseline_cv
+        kind: pct_over_reference
+        pct: 10
+        'True': cv
+      - id: beats_best_baseline_test
+        kind: pct_over_reference
+        pct: 0
+        'True': test
     guardrails: []
+  risks:
+    - problem: The first draft used date as the last complete day with a shifted target, which later stages would
+        not guard.
+      resolution: Switched to the forecasting layout (target date rows, horizon 2 days), which the feature and baseline
+        stages handle natively.
 data:
   sources:
     - name: weather
@@ -216,7 +235,7 @@ data:
       description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01
         to 2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station
         observations. Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
-  date_col: null
+  date_col: date
   id_cols: []
   excluded_cols: []
 eda: {}
@@ -229,6 +248,10 @@ notebooks:
     path: notebooks/02_data_discovery.ipynb
     decisions_hash: a2a85030beea4cec
     run_at: '2026-10-20T13:39:35'
+  framing:
+    path: notebooks/03_problem_framing.ipynb
+    decisions_hash: 7a6ada35600c5ffc
+    run_at: '2026-10-20T13:54:52'
 split: {}
 features: {}
 baseline: {}
@@ -243,11 +266,18 @@ assumptions:
   - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
   - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model
     with no delay; ERA5 runs about 5 days behind).
+  - Persistence from the last complete day is the naive forecast with a 2 day lag.
 open_questions:
   - id: Q1
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
     stage: system
     raised_by: ml-business-framing
+    status: open
+  - id: Q2
+    question: How long should the test period be? 90 days covers only one season; a longer period covers more weather
+      but leaves less history for CV.
+    stage: split
+    raised_by: ml-problem-framing
     status: open
 decisions:
   - date: '2026-10-20'
@@ -259,6 +289,15 @@ decisions:
     decision: Forecasts are made on request, from inputs up to the last complete day; persistence uses that day's
       maximum.
     reason: Requests can arrive at any time, when the current day is not complete.
+  - date: '2026-10-20'
+    stage: framing
+    decision: Forecasting layout with target temperature_2m_max and a horizon of 2 days.
+    reason: Requests arrive when the current day is incomplete, so inputs stop at the last complete day.
+  - date: '2026-10-20'
+    stage: framing
+    decision: MAE is the primary metric; the V1 bar is 10% under the best simple baseline on CV and still under
+      it on test.
+    reason: The user chose it; it matches the 10% in the answer actions.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -293,6 +332,15 @@ history:
   - at: '2026-10-20T13:48:36'
     skill: ml-business-framing
     action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
 version:
   current: V1
   branch: ml/v1

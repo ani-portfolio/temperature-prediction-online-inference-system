@@ -1,0 +1,89 @@
+# Settings the framing notebook was last built from, written by ml-problem-framing. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-problem-framing
+stage: framing
+saved_at: '2026-10-20T13:54:52'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/framing.yaml
+answers:
+  status: draft
+  framing:
+    task_type: forecasting
+    target:
+      name: temperature_2m_max
+      definition: The city's maximum air temperature at 2 m (degrees Celsius) on the target date, its local calendar
+        day.
+      positive_class: null
+      outcome_window: The single target day, two days after the last day the inputs may use
+      exists_in_data: true
+      construction: null
+      label_delay: 1 day (known once the target day is complete and in the archive)
+    unit_of_prediction: One city on one target date (the city's next local day, seen from a request)
+    entity_id_cols:
+      - city
+    population: All 50 cities in the snapshot, every day
+    prediction_time:
+      description: Whenever a request arrives during the day before the target date. The current day is incomplete,
+        so inputs stop at the last complete day, two days before the target date.
+      column: date
+      feature_cutoff: End of the local day two days before the target date (the last complete day)
+      cadence: Online, on request
+      horizon: 2 days
+    success:
+      primary_metric: MAE
+      secondary_metrics:
+        - RMSE
+        - mean error (bias)
+      v1_bar: MAE at least 10% lower than the best simple baseline (persistence, seasonal naive, or moving average)
+        on CV, and still lower than it on the test set
+      guardrails: []
+      v1_criteria:
+        - id: beats_best_baseline_cv
+          kind: pct_over_reference
+          pct: 10
+          true: cv
+        - id: beats_best_baseline_test
+          kind: pct_over_reference
+          pct: 0
+          true: test
+  data:
+    date_col: date
+    id_cols: []
+    excluded_cols: []
+  reasoning:
+    target: The learning question asks for next day maximum temperature, and temperature_2m_max exists for all 50
+      cities with no gaps (discovery). In the forecasting layout the target is the column itself on the target date;
+      the two day horizon keeps the inputs at the last complete day.
+    unit: Discovery found the grain is date plus city, unique, 50 cities by 1,004 days. Each row is one city on
+      one target date; each city has many rows over time, so the split must be by time.
+    prediction_time: Requests can arrive at any time, when the current day is incomplete, so inputs stop at the
+      last complete day. Seen from the target date that is two days earlier, hence a horizon of 2 days, which feature
+      engineering enforces through min_shift_days.
+    success: The output is a temperature, so MAE in degrees is the clearest measure and is less pulled by rare extreme
+      days than RMSE, which is reported as a secondary metric with the bias. MAPE does not suit temperatures near
+      0. The V1 bar compares with the best simple baseline, which includes persistence from the last complete day;
+      10% or more leads to promoting the model, less leads to the 'matches persistence' action.
+    exclusions: No column is recorded after the outcome, and there are no identifiers, personal data, or free text.
+      Redundant columns (grid coordinates, country) are left for feature engineering to keep or drop.
+  checks:
+    data_path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+    test_days: 90
+  risks:
+    - problem: The first draft used date as the last complete day with a shifted target, which later stages would
+        not guard.
+      resolution: Switched to the forecasting layout (target date rows, horizon 2 days), which the feature and baseline
+        stages handle natively.
+  assumptions:
+    - Persistence from the last complete day is the naive forecast with a 2 day lag.
+  open_questions:
+    - question: How long should the test period be? 90 days covers only one season; a longer period covers more
+        weather but leaves less history for CV.
+      stage: split
+  decisions:
+    - decision: Forecasting layout with target temperature_2m_max and a horizon of 2 days.
+      reason: Requests arrive when the current day is incomplete, so inputs stop at the last complete day.
+    - decision: MAE is the primary metric; the V1 bar is 10% under the best simple baseline on CV and still under
+        it on test.
+      reason: The user chose it; it matches the 10% in the answer actions.
+  resolved_questions: []
