@@ -1,0 +1,112 @@
+# Shared spec for this ML project. Each skill reads it first and writes only its own section.
+# You can edit it by hand. Keep the keys, and use null for anything not known yet.
+# Field meanings: reference/spec_fields.md in any of the ML project skills.
+spec_version: 1
+project:
+  name: 16_weather_prediction
+  description: Forecast daily temperature for the coming days from historical weather data.
+  owner: null
+  python: 3.11.8
+  kernel: 16_weather_prediction
+  kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
+  created: '2026-10-20T12:00:53'
+  updated: '2026-10-20T12:01:03'
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  notebooks: notebooks
+  src: src
+  models: models
+  docs: docs
+business:
+  status: not_started
+  mode: null
+  learning_question: null
+  answer_actions: []
+  business_goal: null
+  business_kpi: null
+  decision_supported: null
+  users: null
+  capacity: null
+  current_approach: null
+  outcome: null
+  output_use: null
+  v1_bar_intent: null
+  ml_needed: null
+  ml_needed_reason: null
+  constraints:
+    latency: null
+    interpretability: null
+    fairness: null
+    data_access: null
+    other: []
+  out_of_scope: []
+  risks: []
+discovery: {}
+framing:
+  status: not_started
+  task_type: null
+  target:
+    name: null
+    definition: null
+    positive_class: null
+    outcome_window: null
+    exists_in_data: null
+    construction: null
+    label_delay: null
+  unit_of_prediction: null
+  entity_id_cols: []
+  population: null
+  prediction_time:
+    description: null
+    column: null
+    feature_cutoff: null
+    cadence: null
+    horizon: null
+  success:
+    primary_metric: null
+    secondary_metrics: []
+    v1_bar: null
+    v1_criteria: []
+    guardrails: []
+data:
+  sources: []
+  date_col: null
+  id_cols: []
+  excluded_cols: []
+eda: {}
+notebooks: {}
+split: {}
+features: {}
+baseline: {}
+training: {}
+evaluation: {}
+iterations:
+  current: null
+  entries: []
+autopilot: {}
+assumptions: []
+open_questions: []
+decisions: []
+history:
+  - at: '2026-10-20T12:00:53'
+    skill: ml-project-setup
+    action: created spec
+  - at: '2026-10-20T12:00:53'
+    skill: ml-project-setup
+    action: merge root from tmp61w6fk5p.json
+  - at: '2026-10-20T12:01:03'
+    skill: ml-project-setup
+    action: 'tracking: experiment ml/16-weather-prediction on http://127.0.0.1:5000'
+version:
+  current: V1
+  branch: ml/v1
+  history: []
+git:
+  auto_commit: true
+tracking:
+  uri: http://127.0.0.1:5000
+  experiment: ml/16-weather-prediction
+  experiment_id: '5'
+  ui: http://127.0.0.1:5000/#/experiments/5
+  registered_model: 16-weather-prediction-champion
