@@ -1,0 +1,38 @@
+# Settings the evaluation notebook was last built from, written by ml-offline-evaluation. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-offline-evaluation
+stage: evaluation
+saved_at: '2026-10-20T17:32:05'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/evaluation.yaml
+answers:
+  models: all
+  slices:
+    categorical:
+      - city
+    numeric_bins:
+      latitude: 4
+    time:
+      column: date
+      period: M
+    new_entity: city
+    missing: []
+    protected: []
+    min_rows: 100
+    min_positives: 30
+  bootstrap:
+    n: 200
+    cluster: date
+    seed: 0
+  reasoning:
+    slices: Month shows whether the error changes through the season and as the frozen model ages over 26 weeks;
+      latitude bands separate the southern hemisphere (autumn and winter in the test) from the northern summer;
+      city finds places where the model loses to persistence.
+  risks:
+    - problem: The test period covers April to September only.
+      resolution: Slices by month and latitude show where the result holds; CV covered every season.
+  assumptions: []
+  open_questions: []
+  decisions: []
+  resolved_questions: []
