@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:39:35'
+  updated: '2026-10-20T13:48:36'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -19,11 +19,11 @@ paths:
   models: models
   docs: docs
 business:
-  status: draft
+  status: confirmed
   mode: exploratory
   learning_question: Can I build an end to end online inference system (feature store, champion/challenger gate,
     monitoring) that serves next day maximum temperature forecasts for 50 cities, with a model that beats a simple
-    persistence forecast (tomorrow's maximum equals today's maximum)?
+    persistence forecast (tomorrow's maximum equals the last complete day's maximum)?
   answer_actions:
     - answer: The model clearly beats persistence (for example 10% or more lower error).
       action: Promote it as champion, build the full serving stack around it, and use the gate to judge later challengers.
@@ -35,25 +35,40 @@ business:
   business_goal: null
   business_kpi: null
   decision_supported: null
-  users: null
+  users: The project owner, who builds the system and takes the answer action; portfolio readers see the result
+    but do not act on the forecasts.
   capacity: null
   current_approach: null
-  outcome: null
-  output_use: null
-  v1_bar_intent: null
-  ml_needed: null
-  ml_needed_reason: null
+  outcome: Each city's maximum air temperature (2 m, degrees Celsius) for its next local calendar day, predicted
+    whenever a request arrives, from that city's weather up to and including the last complete day (normally yesterday).
+  output_use: quantity
+  v1_bar_intent: Beat the best simple baseline (persistence from the last complete day) by at least 10% lower error
+    on CV, then promote the model as champion and build the serving stack around it.
+  ml_needed: unsure
+  ml_needed_reason: That is what the experiment should find out; a persistence or seasonal baseline may already
+    come close.
   constraints:
-    latency: null
+    latency: Online, on request. Forecasts are served when a request arrives, not as a nightly batch.
     interpretability: null
     fairness: null
-    data_access: null
-    other: []
-  out_of_scope: []
+    data_access: Open-Meteo free tier only (non commercial, no API key, per minute, hourly, and daily request limits).
+    other:
+      - Only the 50 cities in the snapshot; requests for other locations are out of scope in V1.
+  out_of_scope:
+    - Competing with professional weather forecasts, which use numerical weather models this project does not.
+    - Locations other than the 50 cities.
+    - Forecasts beyond the next day.
   risks:
     - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
         monitoring no quality bar.
       resolution: The learning question now includes beating a persistence forecast.
+    - problem: The first draft assumed forecasts are made the evening before, but requests can arrive at any time,
+        when the current day is incomplete.
+      resolution: Inputs stop at the last complete day, and training must copy that one day gap so offline results
+        match what the live system can do.
+    - problem: The model uses only past weather at each city, so it will be far less accurate than professional
+        forecasts.
+      resolution: Recorded as out of scope; the comparison that matters is against persistence.
 discovery:
   run_at: '2026-10-20T13:39:35'
   notebook: notebooks/02_data_discovery.ipynb
@@ -208,8 +223,8 @@ eda: {}
 notebooks:
   business:
     path: notebooks/01_business_framing.ipynb
-    decisions_hash: 2d7f0cb0b0a305cf
-    run_at: '2026-10-20T12:22:48'
+    decisions_hash: a5f9cc2fb901af28
+    run_at: '2026-10-20T13:48:36'
   discovery:
     path: notebooks/02_data_discovery.ipynb
     decisions_hash: a2a85030beea4cec
@@ -226,12 +241,24 @@ iterations:
 autopilot: {}
 assumptions:
   - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
-open_questions: []
+  - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model
+    with no delay; ERA5 runs about 5 days behind).
+open_questions:
+  - id: Q1
+    question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
+    stage: system
+    raised_by: ml-business-framing
+    status: open
 decisions:
   - date: '2026-10-20'
     stage: business
     decision: Predict the daily maximum temperature one day ahead, not minimum or mean, and not 1 to 7 days.
     reason: The user chose it to keep V1 focused on building the system end to end.
+  - date: '2026-10-20'
+    stage: business
+    decision: Forecasts are made on request, from inputs up to the last complete day; persistence uses that day's
+      maximum.
+    reason: Requests can arrive at any time, when the current day is not complete.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -260,6 +287,12 @@ history:
   - at: '2026-10-20T13:39:35'
     skill: ml-data-discovery
     action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T13:48:36'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T13:48:36'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
 version:
   current: V1
   branch: ml/v1

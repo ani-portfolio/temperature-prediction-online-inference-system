@@ -2,17 +2,17 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-business-framing
 stage: business
-saved_at: '2026-10-20T12:22:48'
+saved_at: '2026-10-20T13:48:37'
 command:
   - make_notebook.py
-  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/business_anchors.yaml
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/business_full.yaml
 answers:
-  status: draft
+  status: confirmed
   business:
     mode: exploratory
     learning_question: Can I build an end to end online inference system (feature store, champion/challenger gate,
       monitoring) that serves next day maximum temperature forecasts for 50 cities, with a model that beats a simple
-      persistence forecast (tomorrow's maximum equals today's maximum)?
+      persistence forecast (tomorrow's maximum equals the last complete day's maximum)?
     answer_actions:
       - answer: The model clearly beats persistence (for example 10% or more lower error).
         action: Promote it as champion, build the full serving stack around it, and use the gate to judge later
@@ -22,32 +22,61 @@ answers:
           features (lags from nearby cities, hourly data) as challengers.
       - answer: The model is worse than persistence.
         action: Look for leakage or a flawed setup first, and ship nothing until it is explained.
-    users: null
-    outcome: null
-    output_use: null
-    v1_bar_intent: null
-    ml_needed: null
-    ml_needed_reason: null
+    users: The project owner, who builds the system and takes the answer action; portfolio readers see the result
+      but do not act on the forecasts.
+    outcome: Each city's maximum air temperature (2 m, degrees Celsius) for its next local calendar day, predicted
+      whenever a request arrives, from that city's weather up to and including the last complete day (normally yesterday).
+    output_use: quantity
+    v1_bar_intent: Beat the best simple baseline (persistence from the last complete day) by at least 10% lower
+      error on CV, then promote the model as champion and build the serving stack around it.
+    ml_needed: unsure
+    ml_needed_reason: That is what the experiment should find out; a persistence or seasonal baseline may already
+      come close.
     constraints:
-      latency: null
+      latency: Online, on request. Forecasts are served when a request arrives, not as a nightly batch.
       interpretability: null
       fairness: null
-      data_access: null
-      other: []
-    out_of_scope: []
+      data_access: Open-Meteo free tier only (non commercial, no API key, per minute, hourly, and daily request
+        limits).
+      other:
+        - Only the 50 cities in the snapshot; requests for other locations are out of scope in V1.
+    out_of_scope:
+      - Competing with professional weather forecasts, which use numerical weather models this project does not.
+      - Locations other than the 50 cities.
+      - Forecasts beyond the next day.
   reasoning:
     mode: This is a portfolio project with no business owner or KPI behind it, so it is framed as an experiment.
     learning: The user's main goal is to build the serving system end to end (feature store, champion/challenger
       gate, monitoring). That alone gives the modelling stages nothing to measure, so the learning question also
-      asks whether the model beats persistence, which the gate and the monitoring can judge against. The target
-      is the daily maximum temperature, one day ahead only. Each answer leads to a different action.
+      asks whether the model beats persistence, which the gate and the monitoring can judge against. Each answer
+      leads to a different action. Persistence now means the last complete day, because forecasts are made on request.
+    outcome: Predictions are made whenever a request arrives, not the evening before, so the current day is usually
+      incomplete. The inputs therefore stop at the last complete day, and the forecast is for the next calendar
+      day, a gap of one day. Discovery found temperature_2m_max for all 50 cities with no gaps, each value known
+      at the end of its local day.
+    output_use: A temperature in degrees Celsius per city, so the metric will be an error measure such as MAE.
+    ml_needed: A simple baseline may already explain most of the daily pattern, which is part of what is being tested.
   risks:
     - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
         monitoring no quality bar.
       resolution: The learning question now includes beating a persistence forecast.
+    - problem: The first draft assumed forecasts are made the evening before, but requests can arrive at any time,
+        when the current day is incomplete.
+      resolution: Inputs stop at the last complete day, and training must copy that one day gap so offline results
+        match what the live system can do.
+    - problem: The model uses only past weather at each city, so it will be far less accurate than professional
+        forecasts.
+      resolution: Recorded as out of scope; the comparison that matters is against persistence.
   assumptions:
     - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
-  open_questions: []
+    - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS
+      model with no delay; ERA5 runs about 5 days behind).
+  open_questions:
+    - question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
+      stage: system
   decisions:
     - decision: Predict the daily maximum temperature one day ahead, not minimum or mean, and not 1 to 7 days.
       reason: The user chose it to keep V1 focused on building the system end to end.
+    - decision: Forecasts are made on request, from inputs up to the last complete day; persistence uses that day's
+        maximum.
+      reason: Requests can arrive at any time, when the current day is not complete.
