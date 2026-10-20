@@ -4,292 +4,315 @@
 sources:
   weather:
     path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
-    description: null
+    description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01 to
+      2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station observations.
+      Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
     columns:
       - column: city
         type: str
         role: categorical
         unique: 50
         missing_pct: 0.0
-        meaning: City (50 distinct values).
-        meaning_source: name
+        meaning: City name, chosen in the downloader's city list. Together with date it identifies a row.
+        meaning_source: reviewed
         timing: static
-        timing_basis: the name contains 'city', which usually describes a stable attribute
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: country
         type: str
         role: categorical
         unique: 36
         missing_pct: 0.0
-        meaning: Country (36 distinct values).
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'count', which usually describes history up to a point in time
+        meaning: Country of the city.
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: latitude
         type: float64
         role: numeric
         unique: 50
         missing_pct: 0.0
-        meaning: Latitude.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Latitude of the city as requested, in decimal degrees (WGS84).
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: longitude
         type: float64
         role: numeric
         unique: 50
         missing_pct: 0.0
-        meaning: Longitude.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Longitude of the city as requested, in decimal degrees (WGS84).
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: grid_latitude
         type: float64
         role: numeric
         unique: 48
         missing_pct: 0.0
-        meaning: Grid latitude.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Latitude of the centre of the model grid cell the API used, which can be a few km from the requested
+          point.
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: grid_longitude
         type: float64
         role: numeric
         unique: 50
         missing_pct: 0.0
-        meaning: Grid longitude.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Longitude of the centre of the model grid cell the API used.
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: elevation
         type: float64
         role: numeric
         unique: 42
         missing_pct: 0.0
-        meaning: Elevation.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Elevation of the location used by the API, in metres above sea level.
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: timezone
         type: str
         role: categorical
         unique: 43
         missing_pct: 0.0
-        meaning: Timezone (43 distinct values).
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: IANA timezone the API assigned from the coordinates (timezone=auto). Daily values follow this local
+          calendar day.
+        meaning_source: reviewed
+        timing: static
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: date
         type: str
         role: date stored as text
         unique: 1005
         missing_pct: 0.0
-        meaning: Date (from 2024-01-01 to 2026-10-01).
-        meaning_source: name
+        meaning: Local calendar date of the row (in the city's timezone).
+        meaning_source: reviewed
         timing: event_time
-        timing_basis: a date or timestamp of an event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'One row per city per date. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
       - column: temperature_2m_max
         type: float64
         role: numeric
         unique: 638
         missing_pct: 0.0
-        meaning: Temperature maximum over the last 2 months.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains '2m_', which usually describes history up to a point in time
+        meaning: 'Maximum air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: temperature_2m_min
         type: float64
         role: numeric
         unique: 594
         missing_pct: 0.0
-        meaning: Temperature minimum over the last 2 months.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains '2m_', which usually describes history up to a point in time
+        meaning: 'Minimum air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: temperature_2m_mean
         type: float64
         role: numeric
         unique: 611
         missing_pct: 0.0
-        meaning: Temperature average over the last 2 months.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains '2m_', which usually describes history up to a point in time
+        meaning: 'Mean air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: apparent_temperature_max
         type: float64
         role: numeric
         unique: 711
         missing_pct: 0.0
-        meaning: Apparent temperature maximum.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'max', which usually describes history up to a point in time
+        meaning: 'Maximum apparent (feels like) temperature during the day, combining temperature, wind, humidity
+          and radiation. Unit: degrees Celsius.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: apparent_temperature_min
         type: float64
         role: numeric
         unique: 696
         missing_pct: 0.0
-        meaning: Apparent temperature minimum.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'min', which usually describes history up to a point in time
+        meaning: 'Minimum apparent (feels like) temperature during the day. Unit: degrees Celsius.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: precipitation_sum
         type: float64
         role: numeric
         unique: 613
         missing_pct: 0.0
-        meaning: Precipitation total.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'n_', which usually describes history up to a point in time
+        meaning: 'Total precipitation during the day (rain, showers, and snowfall as water). Unit: mm.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: rain_sum
         type: float64
         role: numeric
         unique: 612
         missing_pct: 0.0
-        meaning: Rain total.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'n_', which usually describes history up to a point in time
+        meaning: 'Total rain during the day. Unit: mm.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: snowfall_sum
         type: float64
         role: numeric
         unique: 153
         missing_pct: 0.0
-        meaning: Snowfall total.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'sum', which usually describes history up to a point in time
+        meaning: 'Total snowfall during the day. Unit: cm.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: wind_speed_10m_max
         type: float64
         role: numeric
         unique: 511
         missing_pct: 0.0
-        meaning: Wind speed maximum (over a 10 month window).
-        meaning_source: name
-        timing: possibly_after_outcome
-        timing_basis: it looks like an outcome; if it is the target, it is only known after the prediction
-        flags:
-          - candidate_target
-        needs_review: true
-        notes: null
+        meaning: 'Maximum wind speed at 10 m above ground during the day. Unit: km/h.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: wind_gusts_10m_max
         type: float64
         role: numeric
         unique: 295
         missing_pct: 0.0
-        meaning: Wind gusts maximum (over a 10 month window).
-        meaning_source: name
-        timing: possibly_after_outcome
-        timing_basis: it looks like an outcome; if it is the target, it is only known after the prediction
-        flags:
-          - candidate_target
-        needs_review: true
-        notes: null
+        meaning: 'Maximum wind gust at 10 m above ground during the day. Unit: km/h.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: wind_direction_10m_dominant
         type: int64
         role: numeric
         unique: 361
         missing_pct: 0.0
-        meaning: Wind direction dominant (over a 10 month window).
-        meaning_source: name
-        timing: possibly_after_outcome
-        timing_basis: it looks like an outcome; if it is the target, it is only known after the prediction
-        flags:
-          - candidate_target
-        needs_review: true
-        notes: null
+        meaning: 'Dominant wind direction at 10 m above ground during the day. Unit: degrees (0 to 360, from north).'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: shortwave_radiation_sum
         type: float64
         role: numeric
         unique: 3260
         missing_pct: 0.0
-        meaning: Shortwave radiation total.
-        meaning_source: name
-        timing: before_prediction
-        timing_basis: the name contains 'n_', which usually describes history up to a point in time
+        meaning: 'Total shortwave solar radiation during the day. Unit: MJ per square metre.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
         flags: []
         needs_review: false
-        notes: null
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: sunshine_duration
         type: float64
         role: numeric
         unique: 42188
         missing_pct: 0.0
-        meaning: Sunshine duration.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: 'Duration of sunshine during the day. Unit: seconds.'
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'
       - column: weather_code
         type: int64
         role: numeric
         unique: 13
         missing_pct: 0.0
-        meaning: Weather code.
-        meaning_source: name
-        timing: unknown
-        timing_basis: nothing in the name or the data shows when it is filled in
-        flags:
-          - timing_unknown
-        needs_review: true
-        notes: null
+        meaning: Most severe weather condition of the day, as a WMO weather code (for example 0 clear, 61 rain,
+          71 snow).
+        meaning_source: reviewed
+        timing: at_event
+        timing_basis: given in the notebook
+        flags: []
+        needs_review: false
+        notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A
+          next day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+          Historical Weather API docs and src/download_weather.py.'

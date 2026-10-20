@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:38:51'
+  updated: '2026-10-20T13:39:35'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -55,14 +55,16 @@ business:
         monitoring no quality bar.
       resolution: The learning question now includes beating a persistence forecast.
 discovery:
-  run_at: '2026-10-20T13:38:51'
+  run_at: '2026-10-20T13:39:35'
   notebook: notebooks/02_data_discovery.ipynb
   dictionary: docs/data_dictionary.yaml
   main_source: weather
   sources:
     - name: weather
       path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
-      description: null
+      description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01
+        to 2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station
+        observations. Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
       rows: 50250
       columns: 23
       duplicate_rows: 0
@@ -107,22 +109,11 @@ discovery:
   joins: []
   dictionary_summary:
     columns: 23
-    needs_review: 11
+    needs_review: 0
     unclear_meaning: []
-    timing_unknown:
-      - weather.latitude
-      - weather.longitude
-      - weather.grid_latitude
-      - weather.grid_longitude
-      - weather.elevation
-      - weather.timezone
-      - weather.sunshine_duration
-      - weather.weather_code
+    timing_unknown: []
     possibly_after_outcome: []
-    candidate_targets:
-      - weather.wind_speed_10m_max
-      - weather.wind_gusts_10m_max
-      - weather.wind_direction_10m_dominant
+    candidate_targets: []
     personal_data: []
   framing_hints:
     candidate_targets:
@@ -207,7 +198,9 @@ data:
       path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
       rows: 50250
       columns: 23
-      description: null
+      description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01
+        to 2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station
+        observations. Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
   date_col: null
   id_cols: []
   excluded_cols: []
@@ -219,8 +212,8 @@ notebooks:
     run_at: '2026-10-20T12:22:48'
   discovery:
     path: notebooks/02_data_discovery.ipynb
-    decisions_hash: dd2e4cac03ab0887
-    run_at: '2026-10-20T13:38:51'
+    decisions_hash: a2a85030beea4cec
+    run_at: '2026-10-20T13:39:35'
 split: {}
 features: {}
 baseline: {}
@@ -259,6 +252,12 @@ history:
     skill: ml-data-discovery
     action: wrote discovery from its notebook
   - at: '2026-10-20T13:38:51'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T13:39:35'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T13:39:35'
     skill: ml-data-discovery
     action: ran 02_data_discovery.ipynb
 version:
