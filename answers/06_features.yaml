@@ -2,7 +2,7 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-feature-engineering
 stage: features
-saved_at: '2026-10-20T14:25:33'
+saved_at: '2026-10-20T14:26:30'
 command:
   - make_notebook.py
   - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/features.yaml
@@ -156,7 +156,13 @@ answers:
     sunshine_duration_lag_2d: sunshine_duration on the last complete day (2 days before the target)
     weather_code_lag_2d: weather_code on the last complete day (2 days before the target)
   leakage_threshold: 0.9
-  confirmed_safe: []
+  confirmed_safe:
+    - temperature_2m_max_roll_7d_mean_shift_2d
+    - temperature_2m_max_lag_2d
+    - temperature_2m_mean_lag_2d
+    - temperature_2m_max_roll_28d_mean_shift_2d
+    - apparent_temperature_max_lag_2d
+    - temperature_2m_max_lag_3d
   reasoning:
     inputs: Static location columns are known at any time; city lets the model learn each city's level. Redundant
       columns (grid coordinates, country, timezone) are left out. Every same day weather column is on the target
@@ -174,6 +180,11 @@ answers:
       resolution: All same day weather columns are out; each is used only as a lag of 2 days.
     - problem: Lag 364 is empty for the first year (about 16,000 training rows).
       resolution: 'Accepted: trees treat it as missing, and the linear preprocessor imputes it with a missing flag.'
+    - problem: The leakage check flagged six lag and rolling features with association above 0.9.
+      resolution: 'Confirmed safe by the user: all end on the last complete day or earlier.'
+    - problem: Large drift between training and test in the 2 day lags of temperature_2m_min and apparent_temperature_min.
+      resolution: 'Expected: the test period is April to September only, while training covers every season. Watch
+        the test score by month in the evaluation.'
   assumptions:
     - The archive's values for past days do not change after they are first published.
   open_questions: []
@@ -182,6 +193,10 @@ answers:
       reason: The user confirmed (Q3, Q4) that they are known only from the last complete day.
     - decision: Custom features temp_max_change_1d and temp_max_vs_28d_mean.
       reason: The user asked for them as domain features.
+    - decision: 'Confirmed as safe: the target lags 2 and 3, the 7 and 28 day rolling means, and the 2 day lags
+        of temperature_2m_mean and apparent_temperature_max, despite associations above 0.9.'
+      reason: Each ends at least 2 days before the target date (min_shift_days = 2, enforced by the feature code);
+        temperature is persistent, so a high association is expected. Lag 2 is the persistence forecast itself.
   resolved_questions:
     - id: Q3
       answer: temperature_2m_mean is known only 2 or more days later; it is used only as a 2 day lag.

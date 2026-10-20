@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T14:25:31'
+  updated: '2026-10-20T14:26:28'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -494,8 +494,8 @@ notebooks:
     run_at: '2026-10-20T14:08:48'
   features:
     path: notebooks/06_features.ipynb
-    decisions_hash: d31aca78c3cec7db
-    run_at: '2026-10-20T14:25:31'
+    decisions_hash: d1974a0238859849
+    run_at: '2026-10-20T14:26:28'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -663,13 +663,7 @@ features:
     min_shift_days: 2
     target_min_shift_days: 2
     rare_min_frequency: 0.01
-    exclude:
-      - apparent_temperature_max_lag_2d
-      - temperature_2m_max_lag_2d
-      - temperature_2m_max_lag_3d
-      - temperature_2m_max_roll_28d_mean_shift_2d
-      - temperature_2m_max_roll_7d_mean_shift_2d
-      - temperature_2m_mean_lag_2d
+    exclude: []
   inputs:
     - name: latitude
       kind: numeric
@@ -711,6 +705,16 @@ features:
       step: log
       source: elevation
       reason: log of elevation, which is strongly skewed (helps linear models)
+    - name: temperature_2m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: 'the last complete day''s maximum: persistence itself'
+    - name: temperature_2m_max_lag_3d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum a day before that, for the recent trend
     - name: temperature_2m_max_lag_7d
       kind: numeric
       step: lag
@@ -726,6 +730,16 @@ features:
       step: lag
       source: temperature_2m_min
       reason: temperature_2m_min on the last complete day (2 days before the target)
+    - name: temperature_2m_mean_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_mean
+      reason: temperature_2m_mean on the last complete day (2 days before the target)
+    - name: apparent_temperature_max_lag_2d
+      kind: numeric
+      step: lag
+      source: apparent_temperature_max
+      reason: apparent_temperature_max on the last complete day (2 days before the target)
     - name: apparent_temperature_min_lag_2d
       kind: numeric
       step: lag
@@ -771,6 +785,16 @@ features:
       step: lag
       source: weather_code
       reason: weather_code on the last complete day (2 days before the target)
+    - name: temperature_2m_max_roll_7d_mean_shift_2d
+      kind: numeric
+      step: rolling
+      source: temperature_2m_max
+      reason: mean maximum over the week ending on the last complete day
+    - name: temperature_2m_max_roll_28d_mean_shift_2d
+      kind: numeric
+      step: rolling
+      source: temperature_2m_max
+      reason: mean maximum over the 28 days ending on the last complete day
     - name: city
       kind: categorical
       step: column
@@ -813,22 +837,10 @@ features:
       reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
     - column: weather_code
       reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
-    - column: temperature_2m_max_roll_7d_mean_shift_2d
-      reason: single feature score 0.9231 reached the leakage threshold
-    - column: temperature_2m_max_lag_2d
-      reason: single feature score 0.9205 reached the leakage threshold
-    - column: temperature_2m_mean_lag_2d
-      reason: single feature score 0.9163 reached the leakage threshold
-    - column: temperature_2m_max_roll_28d_mean_shift_2d
-      reason: single feature score 0.912 reached the leakage threshold
-    - column: apparent_temperature_max_lag_2d
-      reason: single feature score 0.9096 reached the leakage threshold
-    - column: temperature_2m_max_lag_3d
-      reason: single feature score 0.904 reached the leakage threshold
-  n_inputs: 21
+  n_inputs: 27
   outputs:
-    linear: 84
-    tree: 21
+    linear: 96
+    tree: 27
   files:
     train: data/processed/features_train.parquet
     test: data/processed/features_test.parquet
@@ -843,32 +855,32 @@ features:
         score: 0.9231
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: temperature_2m_max_lag_2d
         score: 0.9205
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: temperature_2m_mean_lag_2d
         score: 0.9163
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: temperature_2m_max_roll_28d_mean_shift_2d
         score: 0.912
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: apparent_temperature_max_lag_2d
         score: 0.9096
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: temperature_2m_max_lag_3d
         score: 0.904
         measure: '|Spearman|'
         flagged: true
-        confirmed safe: false
+        confirmed safe: true
       - feature: temperature_2m_max_lag_7d
         score: 0.8789
         measure: '|Spearman|'
@@ -889,25 +901,28 @@ features:
         measure: '|Spearman|'
         flagged: false
         confirmed safe: false
-    flagged:
+    flagged: []
+    confirmed_safe:
       - temperature_2m_max_roll_7d_mean_shift_2d
       - temperature_2m_max_lag_2d
       - temperature_2m_mean_lag_2d
       - temperature_2m_max_roll_28d_mean_shift_2d
       - apparent_temperature_max_lag_2d
       - temperature_2m_max_lag_3d
-    confirmed_safe: []
     drift_large:
       - temperature_2m_min_lag_2d
+      - temperature_2m_mean_lag_2d
       - apparent_temperature_min_lag_2d
+      - apparent_temperature_max_lag_2d
     problems:
-      - 'Large drift between training and test: temperature_2m_min_lag_2d, apparent_temperature_min_lag_2d.'
-  run_at: '2026-10-20T14:25:31'
+      - 'Large drift between training and test: temperature_2m_min_lag_2d, temperature_2m_mean_lag_2d, apparent_temperature_min_lag_2d,
+        apparent_temperature_max_lag_2d.'
+  run_at: '2026-10-20T14:26:27'
   mlflow:
-    run_id: 43d821c7adab48a29438a724d9fdc330
+    run_id: fe333b7d881e492dac39bb347b58242e
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/43d821c7adab48a29438a724d9fdc330
-    logged_at: '2026-10-20T14:25:32'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/fe333b7d881e492dac39bb347b58242e
+    logged_at: '2026-10-20T14:26:29'
 baseline: {}
 training: {}
 evaluation: {}
@@ -984,6 +999,12 @@ decisions:
     stage: features
     decision: Custom features temp_max_change_1d and temp_max_vs_28d_mean.
     reason: The user asked for them as domain features.
+  - date: '2026-10-20'
+    stage: features
+    decision: 'Confirmed as safe: the target lags 2 and 3, the 7 and 28 day rolling means, and the 2 day lags of
+      temperature_2m_mean and apparent_temperature_max, despite associations above 0.9.'
+    reason: Each ends at least 2 days before the target date (min_shift_days = 2, enforced by the feature code);
+      temperature is persistent, so a high association is expected. Lag 2 is the persistence forecast itself.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -1055,6 +1076,15 @@ history:
     skill: ml-feature-engineering
     action: resolved Q3, Q4
   - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T14:26:27'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T14:26:28'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T14:26:28'
     skill: ml-feature-engineering
     action: ran 06_features.ipynb
 version:
