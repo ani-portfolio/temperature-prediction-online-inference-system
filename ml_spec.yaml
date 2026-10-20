@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T14:08:48'
+  updated: '2026-10-20T14:25:31'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -492,6 +492,10 @@ notebooks:
     path: notebooks/05_split.ipynb
     decisions_hash: fb5a4a3bb601827f
     run_at: '2026-10-20T14:08:48'
+  features:
+    path: notebooks/06_features.ipynb
+    decisions_hash: d31aca78c3cec7db
+    run_at: '2026-10-20T14:25:31'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -569,7 +573,341 @@ split:
     experiment_id: '5'
     url: http://127.0.0.1:5000/#/experiments/5/runs/ece89ff273b34e369a33214c5883ca94
     logged_at: '2026-10-20T14:08:51'
-features: {}
+features:
+  config:
+    numeric:
+      - latitude
+      - longitude
+      - elevation
+      - temp_max_change_1d
+      - temp_max_vs_28d_mean
+    categorical:
+      - city
+    high_cardinality: []
+    date_parts:
+      date:
+        - dayofyear
+        - month
+    days_since: []
+    log:
+      - elevation
+    ratios: []
+    lags:
+      - column: temperature_2m_max
+        days:
+          - 2
+          - 3
+          - 7
+          - 364
+        by: city
+      - column: temperature_2m_min
+        days:
+          - 2
+        by: city
+      - column: temperature_2m_mean
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_max
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_min
+        days:
+          - 2
+        by: city
+      - column: precipitation_sum
+        days:
+          - 2
+        by: city
+      - column: snowfall_sum
+        days:
+          - 2
+        by: city
+      - column: wind_speed_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_gusts_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_direction_10m_dominant
+        days:
+          - 2
+        by: city
+      - column: shortwave_radiation_sum
+        days:
+          - 2
+        by: city
+      - column: sunshine_duration
+        days:
+          - 2
+        by: city
+      - column: weather_code
+        days:
+          - 2
+        by: city
+    rolling:
+      - column: temperature_2m_max
+        windows:
+          - 7
+          - 28
+        stats:
+          - mean
+        shift_days: 2
+        by: city
+    custom: true
+    date_col: date
+    target: temperature_2m_max
+    min_shift_days: 2
+    target_min_shift_days: 2
+    rare_min_frequency: 0.01
+    exclude:
+      - apparent_temperature_max_lag_2d
+      - temperature_2m_max_lag_2d
+      - temperature_2m_max_lag_3d
+      - temperature_2m_max_roll_28d_mean_shift_2d
+      - temperature_2m_max_roll_7d_mean_shift_2d
+      - temperature_2m_mean_lag_2d
+  inputs:
+    - name: latitude
+      kind: numeric
+      step: column
+      source: latitude
+      reason: 'static: hemisphere and climate band'
+    - name: longitude
+      kind: numeric
+      step: column
+      source: longitude
+      reason: 'static: location'
+    - name: elevation
+      kind: numeric
+      step: column
+      source: elevation
+      reason: 'static: altitude lowers temperature'
+    - name: temp_max_change_1d
+      kind: numeric
+      step: column
+      source: temp_max_change_1d
+      reason: 'custom: day over day change on the last complete day (lag 2 minus lag 3)'
+    - name: temp_max_vs_28d_mean
+      kind: numeric
+      step: column
+      source: temp_max_vs_28d_mean
+      reason: 'custom: last complete day against its 28 day mean, warmer than usual lately'
+    - name: date_dayofyear
+      kind: numeric
+      step: date_part
+      source: date
+      reason: smooth seasonal position of the target date
+    - name: date_month
+      kind: numeric
+      step: date_part
+      source: date
+      reason: coarse season of the target date
+    - name: log_elevation
+      kind: numeric
+      step: log
+      source: elevation
+      reason: log of elevation, which is strongly skewed (helps linear models)
+    - name: temperature_2m_max_lag_7d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum a week before the target
+    - name: temperature_2m_max_lag_364d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum on the same date last year, a seasonal anchor (empty during 2024)
+    - name: temperature_2m_min_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_min
+      reason: temperature_2m_min on the last complete day (2 days before the target)
+    - name: apparent_temperature_min_lag_2d
+      kind: numeric
+      step: lag
+      source: apparent_temperature_min
+      reason: apparent_temperature_min on the last complete day (2 days before the target)
+    - name: precipitation_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: precipitation_sum
+      reason: precipitation_sum on the last complete day (2 days before the target)
+    - name: snowfall_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: snowfall_sum
+      reason: snowfall_sum on the last complete day (2 days before the target)
+    - name: wind_speed_10m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_speed_10m_max
+      reason: wind_speed_10m_max on the last complete day (2 days before the target)
+    - name: wind_gusts_10m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_gusts_10m_max
+      reason: wind_gusts_10m_max on the last complete day (2 days before the target)
+    - name: wind_direction_10m_dominant_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_direction_10m_dominant
+      reason: wind_direction_10m_dominant on the last complete day (2 days before the target)
+    - name: shortwave_radiation_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: shortwave_radiation_sum
+      reason: shortwave_radiation_sum on the last complete day (2 days before the target)
+    - name: sunshine_duration_lag_2d
+      kind: numeric
+      step: lag
+      source: sunshine_duration
+      reason: sunshine_duration on the last complete day (2 days before the target)
+    - name: weather_code_lag_2d
+      kind: numeric
+      step: lag
+      source: weather_code
+      reason: weather_code on the last complete day (2 days before the target)
+    - name: city
+      kind: categorical
+      step: column
+      source: city
+      reason: 'category, 50 values: lets the model learn each city''s level'
+  excluded:
+    - column: date
+      reason: the prediction date itself; its calendar parts are used instead
+    - column: grid_latitude
+      reason: redundant with latitude (Spearman 1.00)
+    - column: grid_longitude
+      reason: redundant with longitude (Spearman 1.00)
+    - column: country
+      reason: redundant with city
+    - column: timezone
+      reason: redundant with city and country (Cramer's V 1.00)
+    - column: rain_sum
+      reason: same day value; its lag is left out too, almost identical to precipitation_sum (0.98)
+    - column: temperature_2m_min
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: temperature_2m_mean
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: apparent_temperature_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: apparent_temperature_min
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: precipitation_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: snowfall_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_speed_10m_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_gusts_10m_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_direction_10m_dominant
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: shortwave_radiation_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: sunshine_duration
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: weather_code
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: temperature_2m_max_roll_7d_mean_shift_2d
+      reason: single feature score 0.9231 reached the leakage threshold
+    - column: temperature_2m_max_lag_2d
+      reason: single feature score 0.9205 reached the leakage threshold
+    - column: temperature_2m_mean_lag_2d
+      reason: single feature score 0.9163 reached the leakage threshold
+    - column: temperature_2m_max_roll_28d_mean_shift_2d
+      reason: single feature score 0.912 reached the leakage threshold
+    - column: apparent_temperature_max_lag_2d
+      reason: single feature score 0.9096 reached the leakage threshold
+    - column: temperature_2m_max_lag_3d
+      reason: single feature score 0.904 reached the leakage threshold
+  n_inputs: 21
+  outputs:
+    linear: 84
+    tree: 21
+  files:
+    train: data/processed/features_train.parquet
+    test: data/processed/features_test.parquet
+  code:
+    features: src/features.py
+    custom: src/custom_features.py
+    features_hash: 32c8d1bec95ed0b7
+  checks:
+    leakage_threshold: 0.9
+    strongest:
+      - feature: temperature_2m_max_roll_7d_mean_shift_2d
+        score: 0.9231
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: temperature_2m_max_lag_2d
+        score: 0.9205
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: temperature_2m_mean_lag_2d
+        score: 0.9163
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: temperature_2m_max_roll_28d_mean_shift_2d
+        score: 0.912
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: apparent_temperature_max_lag_2d
+        score: 0.9096
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: temperature_2m_max_lag_3d
+        score: 0.904
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: false
+      - feature: temperature_2m_max_lag_7d
+        score: 0.8789
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: temperature_2m_max_lag_364d
+        score: 0.8761
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: temperature_2m_min_lag_2d
+        score: 0.8671
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: apparent_temperature_min_lag_2d
+        score: 0.8513
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+    flagged:
+      - temperature_2m_max_roll_7d_mean_shift_2d
+      - temperature_2m_max_lag_2d
+      - temperature_2m_mean_lag_2d
+      - temperature_2m_max_roll_28d_mean_shift_2d
+      - apparent_temperature_max_lag_2d
+      - temperature_2m_max_lag_3d
+    confirmed_safe: []
+    drift_large:
+      - temperature_2m_min_lag_2d
+      - apparent_temperature_min_lag_2d
+    problems:
+      - 'Large drift between training and test: temperature_2m_min_lag_2d, apparent_temperature_min_lag_2d.'
+  run_at: '2026-10-20T14:25:31'
+  mlflow:
+    run_id: 43d821c7adab48a29438a724d9fdc330
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/43d821c7adab48a29438a724d9fdc330
+    logged_at: '2026-10-20T14:25:32'
 baseline: {}
 training: {}
 evaluation: {}
@@ -584,6 +922,7 @@ assumptions:
     with no delay; ERA5 runs about 5 days behind).
   - Persistence from the last complete day is the naive forecast with a 2 day lag.
   - The weather of April to September 2026 is like the weather the system will forecast next.
+  - The archive's values for past days do not change after they are first published.
 open_questions:
   - id: Q1
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
@@ -603,13 +942,15 @@ open_questions:
       with the target is 0.976.'
     stage: features
     raised_by: ml-eda-report
-    status: open
+    status: resolved
+    answer: temperature_2m_mean is known only 2 or more days later; it is used only as a 2 day lag.
   - id: Q4
     question: 'Is `apparent_temperature_max` known at prediction time? EDA flagged it as possible leakage: association
       with the target is 0.980.'
     stage: features
     raised_by: ml-eda-report
-    status: open
+    status: resolved
+    answer: apparent_temperature_max is known only 2 or more days later; it is used only as a 2 day lag.
 decisions:
   - date: '2026-10-20'
     stage: business
@@ -635,6 +976,14 @@ decisions:
       CV folds.
     reason: The model forecasts the future; the 2 day horizon is enforced by the feature lags, and longer windows
       give stable scores.
+  - date: '2026-10-20'
+    stage: features
+    decision: Same day weather columns are used only as lags of 2 days; redundant location columns are left out.
+    reason: The user confirmed (Q3, Q4) that they are known only from the last complete day.
+  - date: '2026-10-20'
+    stage: features
+    decision: Custom features temp_max_change_1d and temp_max_vs_28d_mean.
+    reason: The user asked for them as domain features.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -699,6 +1048,15 @@ history:
   - at: '2026-10-20T14:08:48'
     skill: ml-train-test-split
     action: ran 05_split.ipynb
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
 version:
   current: V1
   branch: ml/v1

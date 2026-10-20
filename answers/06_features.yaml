@@ -1,0 +1,189 @@
+# Settings the features notebook was last built from, written by ml-feature-engineering. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-feature-engineering
+stage: features
+saved_at: '2026-10-20T14:25:33'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/features.yaml
+answers:
+  config:
+    numeric:
+      - latitude
+      - longitude
+      - elevation
+      - temp_max_change_1d
+      - temp_max_vs_28d_mean
+    categorical:
+      - city
+    high_cardinality: []
+    date_parts:
+      date:
+        - dayofyear
+        - month
+    days_since: []
+    log:
+      - elevation
+    ratios: []
+    lags:
+      - column: temperature_2m_max
+        days:
+          - 2
+          - 3
+          - 7
+          - 364
+        by: city
+      - column: temperature_2m_min
+        days:
+          - 2
+        by: city
+      - column: temperature_2m_mean
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_max
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_min
+        days:
+          - 2
+        by: city
+      - column: precipitation_sum
+        days:
+          - 2
+        by: city
+      - column: snowfall_sum
+        days:
+          - 2
+        by: city
+      - column: wind_speed_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_gusts_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_direction_10m_dominant
+        days:
+          - 2
+        by: city
+      - column: shortwave_radiation_sum
+        days:
+          - 2
+        by: city
+      - column: sunshine_duration
+        days:
+          - 2
+        by: city
+      - column: weather_code
+        days:
+          - 2
+        by: city
+    rolling:
+      - column: temperature_2m_max
+        windows:
+          - 7
+          - 28
+        stats:
+          - mean
+        shift_days: 2
+        by: city
+    custom: true
+    date_col: date
+    target: temperature_2m_max
+    min_shift_days: 2
+    target_min_shift_days: 2
+    rare_min_frequency: 0.01
+    exclude: []
+  excluded:
+    date: the prediction date itself; its calendar parts are used instead
+    grid_latitude: redundant with latitude (Spearman 1.00)
+    grid_longitude: redundant with longitude (Spearman 1.00)
+    country: redundant with city
+    timezone: redundant with city and country (Cramer's V 1.00)
+    rain_sum: same day value; its lag is left out too, almost identical to precipitation_sum (0.98)
+    temperature_2m_min: same day value on the target date, known only after the outcome; used only as a lag of 2
+      days
+    temperature_2m_mean: same day value on the target date, known only after the outcome; used only as a lag of
+      2 days
+    apparent_temperature_max: same day value on the target date, known only after the outcome; used only as a lag
+      of 2 days
+    apparent_temperature_min: same day value on the target date, known only after the outcome; used only as a lag
+      of 2 days
+    precipitation_sum: same day value on the target date, known only after the outcome; used only as a lag of 2
+      days
+    snowfall_sum: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    wind_speed_10m_max: same day value on the target date, known only after the outcome; used only as a lag of 2
+      days
+    wind_gusts_10m_max: same day value on the target date, known only after the outcome; used only as a lag of 2
+      days
+    wind_direction_10m_dominant: same day value on the target date, known only after the outcome; used only as a
+      lag of 2 days
+    shortwave_radiation_sum: same day value on the target date, known only after the outcome; used only as a lag
+      of 2 days
+    sunshine_duration: same day value on the target date, known only after the outcome; used only as a lag of 2
+      days
+    weather_code: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+  feature_reasons:
+    city: 'category, 50 values: lets the model learn each city''s level'
+    latitude: 'static: hemisphere and climate band'
+    longitude: 'static: location'
+    elevation: 'static: altitude lowers temperature'
+    log_elevation: log of elevation, which is strongly skewed (helps linear models)
+    date_dayofyear: smooth seasonal position of the target date
+    date_month: coarse season of the target date
+    temperature_2m_max_lag_2d: 'the last complete day''s maximum: persistence itself'
+    temperature_2m_max_lag_3d: the maximum a day before that, for the recent trend
+    temperature_2m_max_lag_7d: the maximum a week before the target
+    temperature_2m_max_lag_364d: the maximum on the same date last year, a seasonal anchor (empty during 2024)
+    temperature_2m_max_roll_7d_mean_shift_2d: mean maximum over the week ending on the last complete day
+    temperature_2m_max_roll_28d_mean_shift_2d: mean maximum over the 28 days ending on the last complete day
+    temp_max_change_1d: 'custom: day over day change on the last complete day (lag 2 minus lag 3)'
+    temp_max_vs_28d_mean: 'custom: last complete day against its 28 day mean, warmer than usual lately'
+    temperature_2m_min_lag_2d: temperature_2m_min on the last complete day (2 days before the target)
+    temperature_2m_mean_lag_2d: temperature_2m_mean on the last complete day (2 days before the target)
+    apparent_temperature_max_lag_2d: apparent_temperature_max on the last complete day (2 days before the target)
+    apparent_temperature_min_lag_2d: apparent_temperature_min on the last complete day (2 days before the target)
+    precipitation_sum_lag_2d: precipitation_sum on the last complete day (2 days before the target)
+    snowfall_sum_lag_2d: snowfall_sum on the last complete day (2 days before the target)
+    wind_speed_10m_max_lag_2d: wind_speed_10m_max on the last complete day (2 days before the target)
+    wind_gusts_10m_max_lag_2d: wind_gusts_10m_max on the last complete day (2 days before the target)
+    wind_direction_10m_dominant_lag_2d: wind_direction_10m_dominant on the last complete day (2 days before the
+      target)
+    shortwave_radiation_sum_lag_2d: shortwave_radiation_sum on the last complete day (2 days before the target)
+    sunshine_duration_lag_2d: sunshine_duration on the last complete day (2 days before the target)
+    weather_code_lag_2d: weather_code on the last complete day (2 days before the target)
+  leakage_threshold: 0.9
+  confirmed_safe: []
+  reasoning:
+    inputs: Static location columns are known at any time; city lets the model learn each city's level. Redundant
+      columns (grid coordinates, country, timezone) are left out. Every same day weather column is on the target
+      date, so it would leak the outcome; each is used only as a lag of 2 days.
+    steps: Lags 2 and 3 of the target are persistence and the recent trend, lag 7 a weekly view, and lag 364 the
+      seasonal anchor. Rolling means over 7 and 28 days end on the last complete day. Two custom features compare
+      the last complete day with the day before and with its 28 day mean.
+    history: Every lag and window ends at least 2 days before the target date, the horizon set in the framing, because
+      requests arrive while the current day is incomplete. Lag 364 is empty for 2024.
+    encoding: city is one hot encoded for linear models and ordinal coded for trees, fitted inside each fold. Missing
+      lag values are imputed with the median and flagged for linear models; trees use them as missing.
+  risks:
+    - problem: The suggested inputs used the same day weather columns, and logs of them, on the target row, which
+        would leak the outcome.
+      resolution: All same day weather columns are out; each is used only as a lag of 2 days.
+    - problem: Lag 364 is empty for the first year (about 16,000 training rows).
+      resolution: 'Accepted: trees treat it as missing, and the linear preprocessor imputes it with a missing flag.'
+  assumptions:
+    - The archive's values for past days do not change after they are first published.
+  open_questions: []
+  decisions:
+    - decision: Same day weather columns are used only as lags of 2 days; redundant location columns are left out.
+      reason: The user confirmed (Q3, Q4) that they are known only from the last complete day.
+    - decision: Custom features temp_max_change_1d and temp_max_vs_28d_mean.
+      reason: The user asked for them as domain features.
+  resolved_questions:
+    - id: Q3
+      answer: temperature_2m_mean is known only 2 or more days later; it is used only as a 2 day lag.
+    - id: Q4
+      answer: apparent_temperature_max is known only 2 or more days later; it is used only as a 2 day lag.
