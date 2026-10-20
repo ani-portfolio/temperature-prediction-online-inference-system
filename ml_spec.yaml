@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T17:11:51'
+  updated: '2026-10-20T17:15:38'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -215,11 +215,11 @@ framing:
       - id: beats_best_baseline_cv
         kind: pct_over_reference
         pct: 10
-        'True': cv
+        'on': cv
       - id: beats_best_baseline_test
         kind: pct_over_reference
         pct: 0
-        'True': test
+        'on': test
     guardrails: []
   risks:
     - problem: The first draft used date as the last complete day with a shifted target, which later stages would
@@ -503,7 +503,7 @@ notebooks:
   training:
     path: notebooks/08_training.ipynb
     decisions_hash: 5b6d000bcc06b6b4
-    run_at: '2026-10-20T17:11:51'
+    run_at: '2026-10-20T17:15:38'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -1093,10 +1093,6 @@ training:
           kind: pct_over_reference
           status: pass
           detail: +14.0% against naive, needs 10%.
-        - id: beats_best_baseline_test
-          kind: pct_over_reference
-          status: pass
-          detail: +14.0% against naive, needs 0%.
     path: models/champion_lightgbm.joblib
     serialization: cloudpickle_by_value
   top_features:
@@ -1128,12 +1124,12 @@ training:
     problems: []
     train_score: 1.891419
     cv_score: 2.163048
-  run_at: '2026-10-20T17:11:51'
+  run_at: '2026-10-20T17:15:38'
   mlflow:
-    run_id: 4f1b50b1fea945eab1179586be8b832a
+    run_id: 334a6392ab9b4bcc8a16900da37f2a07
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/4f1b50b1fea945eab1179586be8b832a
-    logged_at: '2026-10-20T17:11:53'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/334a6392ab9b4bcc8a16900da37f2a07
+    logged_at: '2026-10-20T17:15:39'
 evaluation: {}
 system: {}
 iterations:
@@ -1315,6 +1311,18 @@ history:
     skill: ml-model-training
     action: wrote training from its notebook
   - at: '2026-10-20T17:11:51'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T17:14:38'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:14:38'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T17:15:38'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:15:38'
     skill: ml-model-training
     action: ran 08_training.ipynb
 version:
