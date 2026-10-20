@@ -1,0 +1,56 @@
+# Settings the split notebook was last built from, written by ml-train-test-split. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-train-test-split
+stage: split
+saved_at: '2026-10-20T14:08:52'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/split.yaml
+answers:
+  data_path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  target: temperature_2m_max
+  task_type: forecasting
+  target_code: null
+  split:
+    strategy: time
+    test_days: 182
+    gap_days: 0
+    group_col: city
+    date_col: date
+    cv:
+      n_folds: 4
+      window: expanding
+      valid_days: 91
+      train_days: null
+    duplicates: keep_together
+    missing_target: drop
+    seed: 42
+  reasoning:
+    strategy: The model forecasts the future, so the test set is the latest period and CV uses backtest folds that
+      move forward in time. A random split would let the model learn from days after the ones it is scored on. Every
+      city has every date, so each period and fold holds all 50 cities equally, which is the stratification by city
+      the user asked for.
+    test: 'The suggested 2 day test period would hold only 100 forecasts, and one hot spell would swing the score.
+      Each test day is its own 2 day ahead forecast, so the test period can be long: 182 days (2026-04-03 to 2026-10-01)
+      covers spring and summer in the north and autumn and winter in the south, with 9,100 forecasts, and leaves
+      about 822 days for training. No gap is needed, because feature engineering only uses lags of at least 2 days.'
+    cv: Four expanding folds of 91 days cover the last year before the test, so every season is scored once in CV.
+      The first fold trains on about 458 days, and later folds keep all earlier data for the seasonal features.
+    duplicates: There are no duplicate rows; keep_together is the default and changes nothing.
+  risks:
+    - problem: The suggested test period and CV windows were 2 days long, far too few forecasts for a stable score.
+      resolution: A 182 day test period and four 91 day CV windows.
+    - problem: The test period covers only half a year, so the test score says nothing about northern winter.
+      resolution: Accepted; CV covers every season, and the evaluation can slice the test by month and hemisphere.
+  assumptions:
+    - The weather of April to September 2026 is like the weather the system will forecast next.
+  open_questions: []
+  decisions:
+    - decision: Time split with a 182 day test period (2026-04-03 to 2026-10-01), no gap, and four expanding 91
+        day CV folds.
+      reason: The model forecasts the future; the 2 day horizon is enforced by the feature lags, and longer windows
+        give stable scores.
+  resolved_questions:
+    - id: Q2
+      answer: The test period is 182 days (2026-04-03 to 2026-10-01); CV covers the year before it in four 91 day
+        folds.

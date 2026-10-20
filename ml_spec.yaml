@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:58:52'
+  updated: '2026-10-20T14:08:48'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -488,7 +488,87 @@ notebooks:
     path: notebooks/03_problem_framing.ipynb
     decisions_hash: 43a689ce19508ce6
     run_at: '2026-10-20T13:55:19'
-split: {}
+  split:
+    path: notebooks/05_split.ipynb
+    decisions_hash: fb5a4a3bb601827f
+    run_at: '2026-10-20T14:08:48'
+split:
+  strategy: time
+  data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  target: temperature_2m_max
+  task_type: forecasting
+  row_id_col: row_id
+  date_col: date
+  group_col: city
+  stratify: false
+  seed: 42
+  test:
+    rows: 9100
+    share: 0.1811
+    size: null
+    days: 182
+    start: '2026-04-03'
+    end: '2026-10-01'
+  gap_days: 0
+  cv:
+    method: time_backtest
+    n_folds: 4
+    window: expanding
+    valid_days: 91
+    train_days: null
+    folds:
+      - fold: 0
+        n_train: 22950
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-04-03'
+        valid_start: '2025-04-04'
+        valid_end: '2025-07-03'
+      - fold: 1
+        n_train: 27500
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-07-03'
+        valid_start: '2025-07-04'
+        valid_end: '2025-10-02'
+      - fold: 2
+        n_train: 32050
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-10-02'
+        valid_start: '2025-10-03'
+        valid_end: '2026-01-01'
+      - fold: 3
+        n_train: 36600
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2026-01-01'
+        valid_start: '2026-01-02'
+        valid_end: '2026-04-02'
+  duplicates:
+    handling: keep_together
+    rows: 0
+    dropped: 0
+  dropped:
+    missing_target: 0
+    unreadable_dates: 0
+  rows:
+    train: 41150
+    test: 9100
+    gap: 0
+  files:
+    train: data/processed/train.parquet
+    test: data/processed/test.parquet
+    folds: data/processed/cv_folds.parquet
+  checks:
+    problems: []
+    test_rows_with_copy_in_train: 0
+  run_at: '2026-10-20T14:08:48'
+  mlflow:
+    run_id: ece89ff273b34e369a33214c5883ca94
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/ece89ff273b34e369a33214c5883ca94
+    logged_at: '2026-10-20T14:08:51'
 features: {}
 baseline: {}
 training: {}
@@ -503,6 +583,7 @@ assumptions:
   - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model
     with no delay; ERA5 runs about 5 days behind).
   - Persistence from the last complete day is the naive forecast with a 2 day lag.
+  - The weather of April to September 2026 is like the weather the system will forecast next.
 open_questions:
   - id: Q1
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
@@ -514,7 +595,9 @@ open_questions:
       but leaves less history for CV.
     stage: split
     raised_by: ml-problem-framing
-    status: open
+    status: resolved
+    answer: The test period is 182 days (2026-04-03 to 2026-10-01); CV covers the year before it in four 91 day
+      folds.
   - id: Q3
     question: 'Is `temperature_2m_mean` known at prediction time? EDA flagged it as possible leakage: association
       with the target is 0.976.'
@@ -546,6 +629,12 @@ decisions:
     decision: MAE is the primary metric; the V1 bar is 10% under the best simple baseline on CV and still under
       it on test.
     reason: The user chose it; it matches the 10% in the answer actions.
+  - date: '2026-10-20'
+    stage: split
+    decision: Time split with a 182 day test period (2026-04-03 to 2026-10-01), no gap, and four expanding 91 day
+      CV folds.
+    reason: The model forecasts the future; the 2 day horizon is enforced by the feature lags, and longer windows
+      give stable scores.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -601,6 +690,15 @@ history:
   - at: '2026-10-20T13:58:52'
     skill: ml-eda-report
     action: wrote eda for data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
 version:
   current: V1
   branch: ml/v1
