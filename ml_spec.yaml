@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T13:55:19'
+  updated: '2026-10-20T13:58:52'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -238,7 +238,243 @@ data:
   date_col: date
   id_cols: []
   excluded_cols: []
-eda: {}
+eda:
+  mode: targeted
+  run_at: '2026-10-20T13:58:52'
+  source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  report: notebooks/04_eda_open_meteo_daily_2024_01_01_2026_10_01.ipynb
+  rows: 50250
+  columns: 23
+  sampled: false
+  grain:
+    type: pair
+    columns:
+      - date
+      - city
+    other_unique_pairs: []
+  duplicate_rows: 0
+  primary_date:
+    column: date
+    min: '2024-01-01'
+    max: '2026-10-01'
+  columns_by_role:
+    identifier:
+      - city
+    categorical:
+      - country
+      - timezone
+    numeric:
+      - latitude
+      - longitude
+      - grid_latitude
+      - grid_longitude
+      - elevation
+      - temperature_2m_min
+      - temperature_2m_mean
+      - apparent_temperature_max
+      - apparent_temperature_min
+      - precipitation_sum
+      - rain_sum
+      - snowfall_sum
+      - wind_speed_10m_max
+      - wind_gusts_10m_max
+      - wind_direction_10m_dominant
+      - shortwave_radiation_sum
+      - sunshine_duration
+      - weather_code
+    datetime_as_text:
+      - date
+  target:
+    column: temperature_2m_max
+    type: continuous
+    task: regression
+    missing_pct: 0.0
+    unique: 638
+    skew: -0.583
+  top_target_associations:
+    - feature: apparent_temperature_max
+      measure: Spearman
+      association: 0.9797
+      mutual_information: 1.8516
+    - feature: temperature_2m_mean
+      measure: Spearman
+      association: 0.9764
+      mutual_information: 1.6882
+    - feature: temperature_2m_min
+      measure: Spearman
+      association: 0.9142
+      mutual_information: 1.0252
+    - feature: apparent_temperature_min
+      measure: Spearman
+      association: 0.9007
+      mutual_information: 0.974
+    - feature: shortwave_radiation_sum
+      measure: Spearman
+      association: 0.6636
+      mutual_information: 0.3889
+    - feature: timezone
+      measure: Eta
+      association: 0.6568
+      mutual_information: 0.5776
+    - feature: country
+      measure: Eta
+      association: 0.6035
+      mutual_information: 0.5204
+    - feature: sunshine_duration
+      measure: Spearman
+      association: 0.5111
+      mutual_information: 0.2344
+    - feature: grid_latitude
+      measure: Spearman
+      association: -0.3824
+      mutual_information: 0.6038
+    - feature: latitude
+      measure: Spearman
+      association: -0.3817
+      mutual_information: 0.6093
+  leakage_suspects:
+    - column: temperature_2m_mean
+      reasons:
+        - association with the target is 0.976
+    - column: apparent_temperature_max
+      reasons:
+        - association with the target is 0.980
+  suggested_exclusions:
+    - column: city
+      reason: identifier
+    - column: temperature_2m_mean
+      reason: 'possible leakage: association with the target is 0.976'
+    - column: apparent_temperature_max
+      reason: 'possible leakage: association with the target is 0.980'
+  issues:
+    - severity: High
+      area: Target
+      finding: Possible leakage
+      action: Confirm the feature is available at prediction time, and drop it if it is not.
+      columns:
+        - temperature_2m_mean
+        - apparent_temperature_max
+    - severity: High
+      area: Keys and duplicates
+      finding: ID column is not unique
+      action: Check whether the data should have one row per ID, and look for a many to many join.
+      columns:
+        - city
+    - severity: Medium
+      area: Data types
+      finding: Dates stored as text
+      action: Convert with pd.to_datetime.
+      columns:
+        - date
+    - severity: Low
+      area: Relationships
+      finding: Highly correlated numeric pairs (|Spearman| ≥ 0.9)
+      action: Consider keeping only one of each pair for linear models, and check whether one is derived from the
+        other.
+      details: '`longitude` and `grid_longitude` (1.00), `latitude` and `grid_latitude` (1.00), `temperature_2m_min`
+        and `apparent_temperature_min` (0.99), `temperature_2m_mean` and `apparent_temperature_max` (0.98), `precipitation_sum`
+        and `rain_sum` (0.98), `temperature_2m_min` and `temperature_2m_mean` (0.97), `temperature_2m_mean` and
+        `apparent_temperature_min` (0.96), `apparent_temperature_max` and `apparent_temperature_min` (0.95), `temperature_2m_min`
+        and `apparent_temperature_max` (0.94), `precipitation_sum` and `weather_code` (0.92)'
+    - severity: Low
+      area: Numeric columns
+      finding: Highly skewed (absolute skew above 2)
+      action: Consider a log or rank transform for linear models.
+      columns:
+        - elevation
+        - precipitation_sum
+        - rain_sum
+        - snowfall_sum
+    - severity: Low
+      area: Numeric columns
+      finding: Many outliers (over 5% of rows by the IQR rule)
+      action: Check whether extreme values are real before capping them.
+      columns:
+        - elevation
+        - precipitation_sum
+        - rain_sum
+        - sunshine_duration
+    - severity: Low
+      area: Relationships
+      finding: Strongly associated categorical pairs (Cramér's V ≥ 0.8)
+      action: One of each pair may be redundant, or one may be a grouping of the other.
+      details: '`country` and `timezone` (1.00)'
+  missing_groups: []
+  framing_checks:
+    - check: Target column exists
+      status: pass
+      detail: '`temperature_2m_max` is in the data.'
+    - check: Target type matches the task type
+      status: pass
+      detail: '`temperature_2m_max` is continuous, as forecasting needs.'
+    - check: Rows per `city`
+      status: warn
+      detail: 50 distinct values over 50,250 rows, about 1005.0 rows each. Split by `city` or by time so the same
+        entity is not in both train and test.
+    - check: Grain matches the unit of prediction
+      status: pass
+      detail: 'Framing: One city on one target date (the city''s next local day, seen from a request). Every row
+        has a unique `city` + `date`, which matches.'
+    - check: Prediction time column exists
+      status: pass
+      detail: '`date` runs from 2024-01-01 to 2026-10-01.'
+    - check: Leakage suspects handled
+      status: warn
+      detail: 'Not yet excluded: `temperature_2m_mean`, `apparent_temperature_max`.'
+  framing_hints:
+    candidate_targets:
+      - column: wind_speed_10m_max
+        suggested_type: continuous
+        unique: 511
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_gusts_10m_max
+        suggested_type: continuous
+        unique: 295
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_direction_10m_dominant
+        suggested_type: continuous
+        unique: 361
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: city
+        suggested_type: categorical
+        unique: 50
+        missing_pct: 0.0
+        reasons:
+          - first column
+      - column: weather_code
+        suggested_type: categorical
+        unique: 13
+        missing_pct: 0.0
+        reasons:
+          - last column
+    grain:
+      type: pair
+      columns:
+        - date
+        - city
+      other_unique_pairs: []
+    entity_id_candidates:
+      - column: city
+        distinct: 50
+        rows_per_value: 1005.0
+    date_columns:
+      - column: date
+        min: '2024-01-01'
+        max: '2026-10-01'
+        span_days: 1004
+        missing_pct: 0.0
+    main_date: date
+    history_days: 1004
+    post_outcome_suspects: []
 notebooks:
   business:
     path: notebooks/01_business_framing.ipynb
@@ -278,6 +514,18 @@ open_questions:
       but leaves less history for CV.
     stage: split
     raised_by: ml-problem-framing
+    status: open
+  - id: Q3
+    question: 'Is `temperature_2m_mean` known at prediction time? EDA flagged it as possible leakage: association
+      with the target is 0.976.'
+    stage: features
+    raised_by: ml-eda-report
+    status: open
+  - id: Q4
+    question: 'Is `apparent_temperature_max` known at prediction time? EDA flagged it as possible leakage: association
+      with the target is 0.980.'
+    stage: features
+    raised_by: ml-eda-report
     status: open
 decisions:
   - date: '2026-10-20'
@@ -350,6 +598,9 @@ history:
   - at: '2026-10-20T13:55:19'
     skill: ml-problem-framing
     action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T13:58:52'
+    skill: ml-eda-report
+    action: wrote eda for data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
 version:
   current: V1
   branch: ml/v1
