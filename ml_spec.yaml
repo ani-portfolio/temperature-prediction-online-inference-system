@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-21T12:54:01'
+  updated: '2026-10-21T12:54:19'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2368,7 +2368,10 @@ open_questions:
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
     stage: system
     raised_by: ml-business-framing
-    status: open
+    status: resolved
+    answer: Serve persistence from the newest complete day when inputs are stale by up to 3 days or the model fails,
+      then the seasonal naive (same date last year); every response flags fallback_used and inputs_as_of. Recorded
+      in docs/system_design.md (failure handling).
   - id: Q2
     question: How long should the test period be? 90 days covers only one season; a longer period covers more weather
       but leaves less history for CV.
@@ -2688,6 +2691,9 @@ history:
   - at: '2026-10-21T12:54:01'
     skill: ml-system-design
     action: wrote docs/system_design.md
+  - at: '2026-10-21T12:54:19'
+    skill: ml-reconcile-notes
+    action: reconciled 1 notes
 version:
   current: V1
   branch: ml/v1
