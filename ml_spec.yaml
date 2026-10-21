@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T21:43:46'
+  updated: '2026-10-20T21:44:29'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -499,7 +499,7 @@ notebooks:
   baseline:
     path: notebooks/07_baseline.ipynb
     decisions_hash: 823dda73a2257506
-    run_at: '2026-10-20T14:31:05'
+    run_at: '2026-10-20T21:44:29'
   training:
     path: notebooks/08_training.ipynb
     decisions_hash: 5b6d000bcc06b6b4
@@ -1002,12 +1002,12 @@ baseline:
     oof_predictions: data/processed/baseline_oof_predictions.parquet
   checks:
     problems: []
-  run_at: '2026-10-20T14:31:05'
+  run_at: '2026-10-20T21:44:28'
   mlflow:
-    run_id: d940e47e7db1428b8c31ba8725be60ea
+    run_id: bc259115764342b5834f426a24c4ed1d
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/d940e47e7db1428b8c31ba8725be60ea
-    logged_at: '2026-10-20T14:31:06'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/bc259115764342b5834f426a24c4ed1d
+    logged_at: '2026-10-20T21:44:30'
 training:
   models:
     - name: ridge
@@ -2283,6 +2283,12 @@ history:
   - at: '2026-10-20T21:43:46'
     skill: ml-feature-engineering
     action: ran 06_features.ipynb
+  - at: '2026-10-20T21:44:28'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-20T21:44:29'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
 version:
   current: V2
   branch: ml/v2
