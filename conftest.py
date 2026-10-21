@@ -1,4 +1,5 @@
-"""Mark each test by the folder it lives in, so `pytest -m unit` (or component, system) selects one level."""
+"""Mark each test by the level folder it lives in, in tests/ or in a pipeline's tests/, so `pytest -m unit`
+(or component, system) selects one level across the whole project."""
 
 import pytest
 

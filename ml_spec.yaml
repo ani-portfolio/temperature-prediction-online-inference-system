@@ -18,6 +18,11 @@ paths:
   src: src
   models: models
   docs: docs
+  pipelines:
+    feature: src/feature_pipeline
+    training: src/training_pipeline
+    inference: src/inference_pipeline
+    monitoring: src/monitoring_pipeline
 business:
   status: confirmed
   mode: exploratory

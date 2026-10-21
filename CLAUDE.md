@@ -49,3 +49,13 @@ decision: read it before starting any modelling work, and never contradict it wi
 ## Conventions
 * Build paths from the project root, not from the current folder. The folders above are also listed under `paths` in `ml_spec.yaml`.
 * Keep notebooks short. Functions belong in `src/`.
+
+## Deployment layout
+The production system designed in `docs/system_design.md`, one deep package per pipeline, set up by ml-project-setup.
+* `src/feature_pipeline/`: reads raw data and writes features and labels to the feature store.
+* `src/training_pipeline/`: reads point in time correct training data from the feature store and writes a trained model to the model registry.
+* `src/inference_pipeline/`: reads new features and a trained model and writes predictions to their consumer.
+* `src/monitoring_pipeline/`: joins actuals to the logged predictions and writes scores, drift, and gate reports.
+* Each pipeline holds its code, `jobs/` (the entry scripts and job settings the platform runs), and `tests/` (left out of the wheel). The modules at the top of `src/` are shared by notebooks and every pipeline.
+* Pipelines import the shared modules and never each other, and the shared modules import no pipeline. They communicate only through the feature store and the model registry. `tests/unit/test_pipeline_boundaries.py` enforces this.
+* Tests are split by level in folders named `unit/`, `component/`, and `system/`, in `tests/` and in each pipeline's `tests/`. The root `conftest.py` marks every test by its level folder, so `.venv/bin/python -m pytest -m unit` runs one level across the project.

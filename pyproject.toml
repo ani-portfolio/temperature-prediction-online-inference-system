@@ -31,6 +31,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+# Pipeline tests stay in the repo; the wheel Hopsworks installs leaves them out
+exclude = ["src/*/tests"]
 
 [dependency-groups]
 dev = [
@@ -38,7 +40,9 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src"]
+# Test files in different pipelines may share a name
+addopts = "--import-mode=importlib"
 markers = [
     "unit: fast tests of one function, no network or disk outside tmp_path",
     "component: tests of one part of the system (feature store, model registry, API) with its real dependencies",
