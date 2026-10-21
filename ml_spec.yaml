@@ -1,3 +1,6 @@
+# Shared spec for this ML project. Each skill reads it first and writes only its own section.
+# You can edit it by hand. Keep the keys, and use null for anything not known yet.
+# Field meanings: reference/spec_fields.md in any of the ML project skills.
 spec_version: 1
 project:
   name: 16_weather_prediction
@@ -7,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T22:06:01'
+  updated: '2026-10-21T12:50:50'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -67,7 +70,7 @@ business:
         forecasts.
       resolution: Recorded as out of scope; the comparison that matters is against persistence.
 discovery:
-  run_at: '2026-10-20T13:39:35'
+  run_at: '2026-10-20T23:04:27'
   notebook: notebooks/02_data_discovery.ipynb
   dictionary: docs/data_dictionary.yaml
   main_source: weather
@@ -86,7 +89,10 @@ discovery:
           - date
           - city
         other_unique_pairs: []
-      entity_id_candidates: []
+      entity_id_candidates:
+        - column: city
+          distinct: 50
+          rows_per_value: 1005.0
       date_columns:
         - column: date
           min: '2024-01-01'
@@ -100,6 +106,9 @@ discovery:
       thin_months:
         - 2026-10
       issues:
+        - severity: High
+          finding: ID column is not unique
+          count: 1
         - severity: Medium
           finding: Dates stored as text
           count: 1
@@ -114,8 +123,9 @@ discovery:
           count: 4
         - severity: Low
           finding: Strongly associated categorical pairs (Cramér's V ≥ 0.8)
-          count: 3
+          count: 1
       issue_counts:
+        High: 1
         Medium: 1
         Low: 4
   joins: []
@@ -168,7 +178,10 @@ discovery:
         - date
         - city
       other_unique_pairs: []
-    entity_id_candidates: []
+    entity_id_candidates:
+      - column: city
+        distinct: 50
+        rows_per_value: 1005.0
     date_columns:
       - column: date
         min: '2024-01-01'
@@ -237,7 +250,7 @@ data:
   excluded_cols: []
 eda:
   mode: targeted
-  run_at: '2026-10-20T13:58:52'
+  run_at: '2026-10-20T23:04:38'
   source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
   report: notebooks/04_eda_open_meteo_daily_2024_01_01_2026_10_01.ipynb
   rows: 50250
@@ -475,36 +488,36 @@ eda:
 notebooks:
   business:
     path: notebooks/01_business_framing.ipynb
-    decisions_hash: a5f9cc2fb901af28
-    run_at: '2026-10-20T13:48:36'
+    decisions_hash: f773d00d4f9cf275
+    run_at: '2026-10-20T23:04:23'
   discovery:
     path: notebooks/02_data_discovery.ipynb
     decisions_hash: a2a85030beea4cec
-    run_at: '2026-10-20T13:39:35'
+    run_at: '2026-10-20T23:04:27'
   framing:
     path: notebooks/03_problem_framing.ipynb
-    decisions_hash: 43a689ce19508ce6
-    run_at: '2026-10-20T13:55:19'
+    decisions_hash: 682baa21186d9337
+    run_at: '2026-10-20T23:04:29'
   split:
     path: notebooks/05_split.ipynb
     decisions_hash: fb5a4a3bb601827f
-    run_at: '2026-10-20T14:08:48'
+    run_at: '2026-10-20T23:04:40'
   features:
     path: notebooks/06_features.ipynb
     decisions_hash: d1974a0238859849
-    run_at: '2026-10-20T14:26:28'
+    run_at: '2026-10-20T23:04:46'
   baseline:
     path: notebooks/07_baseline.ipynb
     decisions_hash: 823dda73a2257506
-    run_at: '2026-10-20T14:31:05'
+    run_at: '2026-10-20T23:04:50'
   training:
     path: notebooks/08_training.ipynb
     decisions_hash: 5b6d000bcc06b6b4
-    run_at: '2026-10-20T17:15:38'
+    run_at: '2026-10-20T23:15:44'
   evaluation:
     path: notebooks/09_evaluation.ipynb
-    decisions_hash: 691949232f8b69a8
-    run_at: '2026-10-20T17:33:32'
+    decisions_hash: 188930d2a7e9117d
+    run_at: '2026-10-20T23:16:09'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -576,12 +589,12 @@ split:
   checks:
     problems: []
     test_rows_with_copy_in_train: 0
-  run_at: '2026-10-20T14:08:48'
+  run_at: '2026-10-20T23:04:40'
   mlflow:
-    run_id: ece89ff273b34e369a33214c5883ca94
+    run_id: 674251fab9fc433d91bba3f65778cf74
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/ece89ff273b34e369a33214c5883ca94
-    logged_at: '2026-10-20T14:08:51'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/674251fab9fc433d91bba3f65778cf74
+    logged_at: '2026-10-20T23:04:42'
 features:
   config:
     numeric:
@@ -926,12 +939,12 @@ features:
     problems:
       - 'Large drift between training and test: temperature_2m_min_lag_2d, temperature_2m_mean_lag_2d, apparent_temperature_min_lag_2d,
         apparent_temperature_max_lag_2d.'
-  run_at: '2026-10-20T14:26:27'
+  run_at: '2026-10-20T23:04:46'
   mlflow:
-    run_id: fe333b7d881e492dac39bb347b58242e
+    run_id: 7403c1f16d964582bba8f9d0c24735f1
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/fe333b7d881e492dac39bb347b58242e
-    logged_at: '2026-10-20T14:26:29'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/7403c1f16d964582bba8f9d0c24735f1
+    logged_at: '2026-10-20T23:04:47'
 baseline:
   metrics:
     primary:
@@ -994,12 +1007,12 @@ baseline:
     oof_predictions: data/processed/baseline_oof_predictions.parquet
   checks:
     problems: []
-  run_at: '2026-10-20T14:31:05'
+  run_at: '2026-10-20T23:04:49'
   mlflow:
-    run_id: d940e47e7db1428b8c31ba8725be60ea
+    run_id: 36328cf5fecf4ee091456caae1659fdd
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/d940e47e7db1428b8c31ba8725be60ea
-    logged_at: '2026-10-20T14:31:06'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/36328cf5fecf4ee091456caae1659fdd
+    logged_at: '2026-10-20T23:04:50'
 training:
   models:
     - name: ridge
@@ -1023,7 +1036,7 @@ training:
   settings:
     seed: 42
     selection: best_mean
-  data_version: 03f76d78ab4a
+  data_version: c5fbc6c59e95
   primary_label: mae
   leaderboard:
     - model: lightgbm
@@ -1031,7 +1044,7 @@ training:
       primary_mean: 2.163048
       primary_std: 0.23589
       trials: 20.0
-      minutes: 10.4
+      minutes: 10.0
       kind: ml
       vs reference %: 14.0
     - model: ridge
@@ -1080,7 +1093,7 @@ training:
       subsample_freq: 1
     class_weight: null
     inputs: null
-    run_id: 3e1d937d9c18-12
+    run_id: 148761002055-12
     mae: 2.163048
     std: 0.23589
     vs_reference_pct: 14.0
@@ -1125,12 +1138,12 @@ training:
     problems: []
     train_score: 1.891419
     cv_score: 2.163048
-  run_at: '2026-10-20T17:15:38'
+  run_at: '2026-10-20T23:15:44'
   mlflow:
-    run_id: 334a6392ab9b4bcc8a16900da37f2a07
+    run_id: d886f600863949daa962460432a203af
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/334a6392ab9b4bcc8a16900da37f2a07
-    logged_at: '2026-10-20T17:15:39'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/d886f600863949daa962460432a203af
+    logged_at: '2026-10-20T23:15:46'
 evaluation:
   champion: lightgbm
   primary_label: mae
@@ -1910,6 +1923,12 @@ evaluation:
       answer: Prediction drift (PSI) 0.311, a large shift; drift of the actual values 0.256, a large shift. The
         actual values moved as well, so the shift comes from the data; the bias metric shows whether the model kept
         up.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T17:32:02 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T17:33:32 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
   v1:
     cv:
       'on': cv
@@ -1977,14 +1996,240 @@ evaluation:
     - at: '2026-10-20T17:33:32'
       champion: lightgbm
       data_version: 03f76d78ab4a
+    - at: '2026-10-20T23:16:09'
+      champion: lightgbm
+      data_version: c5fbc6c59e95
   decision: null
-  run_at: '2026-10-20T17:33:32'
+  run_at: '2026-10-20T23:16:09'
   mlflow:
-    run_id: 6d822e54fefa4f1ebf0e88a0872721a7
+    run_id: b4687f33c96346f2bea31c6ca2ed11be
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/6d822e54fefa4f1ebf0e88a0872721a7
-    logged_at: '2026-10-20T17:33:33'
-system: {}
+    url: http://127.0.0.1:5000/#/experiments/5/runs/b4687f33c96346f2bea31c6ca2ed11be
+    logged_at: '2026-10-20T23:16:10'
+system:
+  status: draft
+  platform:
+    kind: platform
+    name: hopsworks
+  entry:
+    outcome: go
+    answer: null
+    reason: null
+    evaluation_decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never
+      significantly worse than persistence in any city.'
+  champion: lightgbm
+  components:
+    ingestion:
+      needed: true
+      tool: Hopsworks job (Python) writing to the feature group weather_daily
+      settings:
+        frequency: hourly
+        source: Open-Meteo archive API, all 50 cities in one batched request per run
+        limits: Open-Meteo free tier (non commercial; per minute, hourly, and daily request caps), one request per
+          run
+        fetch: the newest day only
+        feature_group: weather_daily (primary key city, event time date)
+      reason: The 50 cities close their local day at different UTC hours, so an hourly run keeps each city's last
+        complete day available soon after it ends, for requests that arrive at any time.
+    data_validation:
+      needed: true
+      tool: Great Expectations suite attached to weather_daily (strict ingestion policy)
+      settings:
+        checks:
+          - the 23 columns and their types
+          - value ranges (temperatures -90 to 60 C; precipitation
+          - snowfall
+          - wind
+          - radiation at least 0; wind direction 0 to 360; sunshine 0 to 86400 s; valid WMO weather_code)
+          - min <= mean <= max temperature
+          - one row per city and date
+          - only the 50 known cities
+        freshness: checked separately per city against its last complete local day; a late day triggers the fallback,
+          not a rejection
+        on_failure: reject the batch and alert
+      reason: A bad upstream day must never become features, while a late day is handled by the fallback.
+    features:
+      needed: true
+      tool: Hopsworks feature group weather_features and a feature view (offline and online store)
+      settings:
+        served_inputs:
+          - latitude
+          - longitude
+          - elevation
+          - temp_max_change_1d
+          - temp_max_vs_28d_mean
+          - date_dayofyear
+          - date_month
+          - log_elevation
+          - temperature_2m_max_lag_2d
+          - temperature_2m_max_lag_3d
+          - temperature_2m_max_lag_7d
+          - temperature_2m_max_lag_364d
+          - temperature_2m_min_lag_2d
+          - temperature_2m_mean_lag_2d
+          - apparent_temperature_max_lag_2d
+          - apparent_temperature_min_lag_2d
+          - precipitation_sum_lag_2d
+          - snowfall_sum_lag_2d
+          - wind_speed_10m_max_lag_2d
+          - wind_gusts_10m_max_lag_2d
+          - wind_direction_10m_dominant_lag_2d
+          - shortwave_radiation_sum_lag_2d
+          - sunshine_duration_lag_2d
+          - weather_code_lag_2d
+          - temperature_2m_max_roll_7d_mean_shift_2d
+          - temperature_2m_max_roll_28d_mean_shift_2d
+          - city
+        code: src/features.build_features, the same function used in training (features hash 32c8d1bec95ed0b7)
+        rows: one per city and target date; the row for target date T uses data up to T minus 2 days
+        offline_store: point in time training data from the feature view
+        online_store: the latest row per city; every lag and rolling mean is precomputed, so a request only looks
+          up the city
+        encoding: the ordinal encoding of city stays inside the model pipeline
+        backfill: run the feature pipeline once over 2024-01-01 to today, and again when a definition changes
+      reason: One build_features for training and serving means the features cannot drift apart, and precomputed
+        rows keep request time work to a lookup.
+    training:
+      needed: true
+      tool: Hopsworks job creating training data from the feature view
+      settings:
+        trigger: on drift (from monitoring) or by hand
+        window: expanding, from 2024-01-01 to the last labelled day minus the 28 day holdout
+        refit: LightGBM with the champion's tuned settings, no retuning (retuning and new features stay in /ml-iterate)
+        output: a candidate model in the Hopsworks registry; it becomes the challenger only if it passes the offline
+          holdout test
+      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; a refit is started
+        when monitoring flags drift or by hand.
+    registry:
+      needed: true
+      tool: Hopsworks model registry
+      settings:
+        decides_champion: Hopsworks registry decides the champion and challenger once deployed; MLflow keeps the
+          local experiments, linked by the MLflow run id
+        gate:
+          metric: MAE
+          test:
+            name: diebold_mariano
+            alpha: 0.05
+            sided: one
+          window_days: null
+          promotion: manual
+        entry: a candidate becomes the challenger when it beats the champion on the most recent 28 labelled days,
+          after both models' training cutoffs, with the same one sided Diebold-Mariano test at alpha 0.05
+        live: the challenger predicts in shadow next to the champion; both are scored on the same city-days, and
+          the owner promotes by hand once the test is significant
+        after_promotion: the previous champion stays in shadow for 28 days, then is retired
+        lineage: model version, MLflow run id, feature view version, features hash, training dataset version
+      reason: A paired significance test on the daily MAE gap judges two models on the same days, so the seasonal
+        difficulty that inflates the CV spread cancels out; no fixed margin is needed.
+    inference:
+      needed: true
+      tool: Hopsworks KServe predictor reading the online feature view
+      settings:
+        mode: online
+        schedule: on_request
+        steps: look up the city's latest feature row, check it is for tomorrow's target date (else the fallback),
+          predict with the champion and every shadow model
+        logging: one row per model per request in the feature group predictions (request id and time, city, target
+          date, model name and version, prediction, served or shadow, fallback used, feature row version, the persistence
+          forecast)
+        dedup: one prediction per city, target date, and model for the gate and monitoring, since repeat requests
+          on a day use the same features
+      reason: Online inference is the learning goal and the framing's cadence; logging every model's prediction
+        is what the gate and monitoring read.
+    serving:
+      needed: true
+      tool: Hopsworks model deployment (KServe) with a predictor script
+      settings:
+        environments:
+          - prod
+        secrets: the Hopsworks API key in the environment, never in code
+        contract: request {city}; response {city, target_date, forecast_max_c, model_version, fallback_used, inputs_as_of};
+          a city outside the 50 returns an error
+        rollback: switch the deployment to the previous model version, one step
+      reason: One environment is enough for a portfolio project; the component tests run against a separate Hopsworks
+        test project instead of a dev environment.
+    label_feedback:
+      needed: true
+      tool: Daily Hopsworks job joining actuals into the feature group scored_predictions
+      settings:
+        label_arrives: the day after the target date (1 day label delay)
+        join: city and target date
+        output: city, target date, model version, served or shadow, prediction, actual, absolute error
+      reason: The gate's test and monitoring read only this table, so the join is done once.
+    monitoring:
+      needed: true
+      tool: Hopsworks feature monitoring plus Evidently, as a daily job after label feedback
+      settings:
+        data_drift: PSI of each input against the same calendar month in training; alert above 0.25
+        prediction_drift: PSI of the predictions against the same calendar month in training; alert above 0.25
+        performance: the served model's rolling 28 day live MAE against persistence on the same city-days; alert
+          when the reverse one sided Diebold-Mariano test says the model is not better; shown next to the evaluation's
+          monthly MAE (1.79 to 2.44 C)
+        system_health: failed jobs, predictor errors and latency, the daily share of requests served by the fallback
+          (alert under 95% model served)
+        alerts: email to the owner
+      reason: The evaluation's PSI (0.31 on predictions, 0.26 on actuals) came from the seasons, so drift is compared
+        month for month.
+    failure_handling:
+      needed: true
+      tool: Fallback in the predictor script
+      settings:
+        fallback: persistence from the newest complete day when inputs are stale by up to 3 days or the model fails;
+          the seasonal naive (the same date last year) when inputs are more than 3 days old
+        flags: fallback_used and inputs_as_of in every response
+        target: every request for one of the 50 cities gets a forecast; at least 95% of a day's requests are served
+          by the model
+      reason: Persistence is the baseline the model must beat (the user's answer to Q1); it degrades with age, so
+        the seasonal value takes over after 3 days.
+    orchestration:
+      needed: true
+      tool: Hopsworks jobs with schedules
+      settings:
+        order:
+          - hourly ingestion and validation
+          - then the feature pipeline; daily label feedback
+          - then monitoring; training on drift or by hand
+          - then the offline holdout test
+        retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
+          serving with the fallback
+      reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed.
+    testing:
+      needed: true
+      tool: pytest (tests/unit, tests/component, tests/system)
+      settings:
+        unit: build_features on a small fixed history (lags never shorter than 2 days, rolling means end on the
+          last complete day), the fallback rules, src/compare.py's Diebold-Mariano and block bootstrap against known
+          cases
+        component: the validation suite rejects bad batches; the feature pipeline writes the same values offline
+          and online for one city (training and serving skew); the predictor falls back on a stale row; run against
+          a separate Hopsworks test project
+        system: raw rows for one city through ingestion, features, the deployed predictor, and label feedback, ending
+          in a scored prediction
+      reason: The skew between offline and online features is the costliest silent bug, and with prod only the component
+        tests stand in for a dev environment.
+  champion_dependent:
+    - features
+    - registry
+    - monitoring
+    - failure_handling
+  warnings_accepted: []
+  risks:
+    - problem: Open-Meteo's archive serves recent days from one model and may replace them with ERA5 reanalysis
+        about 5 days later; with the newest day fetched once and no revision check, a changed value would go unseen.
+      resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
+    - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
+        may take months to reach significance.
+      resolution: If the gate stalls, add a daily scheduled request for all 50 cities.
+    - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
+        raises the real false promotion rate above alpha.
+      resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
+        borderline.
+    - problem: With prod only, every deployment change is first exercised live.
+      resolution: Component tests run against a separate Hopsworks test project.
+  doc: docs/system_design.md
+  run_at: '2026-10-21T12:50:49'
+  doc_hash: bc556ee4b68ea907
 iterations:
   current: null
   entries:
@@ -2108,12 +2353,16 @@ iterations:
     max_iterations: 3
 autopilot: {}
 assumptions:
-  - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
+  - The forecast is for the next calendar day only (one day after the request, two days after the last complete
+    day), for the daily maximum temperature at 2 m.
   - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model
     with no delay; ERA5 runs about 5 days behind).
   - Persistence from the last complete day is the naive forecast with a 2 day lag.
   - The weather of April to September 2026 is like the weather the system will forecast next.
   - The archive's values for past days do not change after they are first published.
+  - The forecast is for the next calendar day only (one day after the request, two days after the last complete
+    day), for the daily maximum temperature at 2 m.
+  - The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
 open_questions:
   - id: Q1
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
@@ -2142,6 +2391,12 @@ open_questions:
     raised_by: ml-eda-report
     status: resolved
     answer: apparent_temperature_max is known only 2 or more days later; it is used only as a 2 day lag.
+  - id: Q5
+    question: Which Hopsworks project and cluster will host the system, and which separate project runs the component
+      tests?
+    stage: system
+    raised_by: ml-system-design
+    status: open
 decisions:
   - date: '2026-10-20'
     stage: business
@@ -2196,12 +2451,38 @@ decisions:
     reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
       on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over
       26 weeks. This matches the answer action for beating persistence by 10% or more.
+    superseded_by: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never significantly
+      worse than persistence in any city.'
+    superseded_on: '2026-10-20'
   - date: '2026-10-20'
     stage: iteration
     decision: 'Closed iteration 1 (V2): rolled back.'
     reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
       2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
       2.2301). The iteration bar failed, so V1 stays.'
+  - date: '2026-10-20'
+    stage: evaluation
+    decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never significantly
+      worse than persistence in any city.'
+    reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
+      on CV and test, beats persistence in every month and latitude band, and is never significantly worse in any
+      city (Casablanca and Mumbai are ties, with intervals that include zero), and shows no accuracy decay over
+      26 weeks. This matches the answer action for beating persistence by 10% or more.
+  - date: '2026-10-21'
+    stage: system
+    decision: Use Hopsworks for the deployed system, including the registry, champion, and challenger; MLflow keeps
+      local experiments.
+    reason: The user chose it at the start of the design.
+  - date: '2026-10-21'
+    stage: system
+    decision: The promotion gate is a paired one sided Diebold-Mariano test on daily MAE at alpha 0.05, with a recent
+      28 day holdout for the challenger entry, manual promotion, and the previous champion in shadow for 28 days.
+    reason: The user chose statistical significance over a fixed margin; the CV std margin reflected seasonal difficulty,
+      not the noise of a paired comparison.
+  - date: '2026-10-21'
+    stage: system
+    decision: When inputs are stale, serve persistence for up to 3 days, then the seasonal naive.
+    reason: The user's answer to Q1 (serve the baseline), refined so every request gets a forecast.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2323,6 +2604,84 @@ history:
   - at: '2026-10-20T22:06:01'
     skill: ml-iterate
     action: closed iteration 1 (rolled_back)
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T23:04:23'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T23:04:23'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T23:04:27'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T23:04:27'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T23:04:38'
+    skill: ml-eda-report
+    action: wrote eda for data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T23:04:49'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-20T23:04:50'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
+  - at: '2026-10-20T23:15:44'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T23:15:44'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T23:16:09'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-20T23:16:09'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T23:16:11'
+    skill: ml-reconcile-notes
+    action: reconciled 6 notes
+  - at: '2026-10-21T12:50:49'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-21T12:50:50'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
 version:
   current: V1
   branch: ml/v1

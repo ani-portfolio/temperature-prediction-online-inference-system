@@ -59,6 +59,10 @@ Not sure yet. That is what the experiment should find out; a persistence or seas
 
 * The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
 * The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model with no delay; ERA5 runs about 5 days behind).
+* Persistence from the last complete day is the naive forecast with a 2 day lag.
+* The weather of April to September 2026 is like the weather the system will forecast next.
+* The archive's values for past days do not change after they are first published.
+* The forecast is for the next calendar day only (one day after the request, two days after the last complete day), for the daily maximum temperature at 2 m.
 
 ## Open Questions
 

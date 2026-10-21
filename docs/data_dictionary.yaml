@@ -10,7 +10,7 @@ sources:
     columns:
       - column: city
         type: str
-        role: categorical
+        role: identifier
         unique: 50
         missing_pct: 0.0
         meaning: City name, chosen in the downloader's city list. Together with date it identifies a row.
