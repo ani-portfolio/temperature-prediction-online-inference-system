@@ -1,6 +1,6 @@
 # Model Card: 16_weather_prediction
 
-**Evaluated:** 2026-10-20  
+**Evaluated:** 2026-10-21  
 **Source:** `notebooks/09_evaluation.ipynb`, written from `ml_spec.yaml`. Rerun the notebook to update it.
 
 ## Purpose
@@ -29,7 +29,7 @@ There is no current approach, so the champion is compared with the best simple b
 
 ## Results on the Test Set
 
-**The test set has been opened 3 times.** Scores after the first look are optimistic, because earlier test results shaped the changes since.
+**The test set has been opened 4 times.** Scores after the first look are optimistic, because earlier test results shaped the changes since.
 
 Primary metric: mae. Intervals are 95% bootstrap intervals, resampling whole date values.
 
@@ -61,6 +61,7 @@ Paired bootstrap differences; positive is better, also for error metrics.
 | Has the data shifted? | Prediction drift (PSI) 0.311, a large shift; drift of the actual values 0.256, a large shift. The actual values moved as well, so the shift comes from the data; the bias metric shows whether the model kept up. |
 | Was the test set used before? | The test set was opened on 2026-10-20T17:32:02 for champion lightgbm. The champion or the data changed since, so if that change followed the earlier test results, this test score is optimistic. |
 | Was the test set used before? | The test set was opened on 2026-10-20T17:33:32 for champion lightgbm. The champion or the data changed since, so if that change followed the earlier test results, this test score is optimistic. |
+| Was the test set used before? | The test set was opened on 2026-10-20T23:16:09 for champion lightgbm. The champion or the data changed since, so if that change followed the earlier test results, this test score is optimistic. |
 
 ## Slices
 
@@ -83,19 +84,19 @@ Paired bootstrap differences; positive is better, also for error metrics.
 
 ## Limitations and Assumptions
 
-* The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
+* The forecast is for the next calendar day only (one day after the request, two days after the last complete day), for the daily maximum temperature at 2 m.
 * The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model with no delay; ERA5 runs about 5 days behind).
 * Persistence from the last complete day is the naive forecast with a 2 day lag.
 * The weather of April to September 2026 is like the weather the system will forecast next.
 * The archive's values for past days do not change after they are first published.
 * The forecast is for the next calendar day only (one day after the request, two days after the last complete day), for the daily maximum temperature at 2 m.
+* The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
 
 ## Open Questions
 
-* Q1: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
+* Q5: Which Hopsworks project and cluster will host the system, and which separate project runs the component tests?
 
 ## Decision
 
-* 2026-10-20: Go: promote lightgbm as the V1 champion and build the serving stack around it. It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over 26 weeks. This matches the answer action for beating persistence by 10% or more.
 * 2026-10-20: Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never significantly worse than persistence in any city. It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar on CV and test, beats persistence in every month and latitude band, and is never significantly worse in any city (Casablanca and Mumbai are ties, with intervals that include zero), and shows no accuracy decay over 26 weeks. This matches the answer action for beating persistence by 10% or more.
-<!-- written by ml-offline-evaluation. If you edit this card, the next run keeps it and writes model_card_new.md: 64b998c74ddd2753 -->
+<!-- written by ml-offline-evaluation. If you edit this card, the next run keeps it and writes model_card_new.md: b7112ba0d03503bc -->

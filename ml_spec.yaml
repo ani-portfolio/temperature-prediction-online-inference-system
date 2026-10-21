@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-21T12:54:19'
+  updated: '2026-10-21T13:43:34'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -501,23 +501,23 @@ notebooks:
   split:
     path: notebooks/05_split.ipynb
     decisions_hash: fb5a4a3bb601827f
-    run_at: '2026-10-20T23:04:40'
+    run_at: '2026-10-21T13:16:30'
   features:
     path: notebooks/06_features.ipynb
     decisions_hash: d1974a0238859849
-    run_at: '2026-10-20T23:04:46'
+    run_at: '2026-10-21T13:16:38'
   baseline:
     path: notebooks/07_baseline.ipynb
     decisions_hash: 823dda73a2257506
-    run_at: '2026-10-20T23:04:50'
+    run_at: '2026-10-21T13:16:44'
   training:
     path: notebooks/08_training.ipynb
     decisions_hash: 5b6d000bcc06b6b4
-    run_at: '2026-10-20T23:15:44'
+    run_at: '2026-10-21T13:28:44'
   evaluation:
     path: notebooks/09_evaluation.ipynb
     decisions_hash: 188930d2a7e9117d
-    run_at: '2026-10-20T23:16:09'
+    run_at: '2026-10-21T13:29:15'
 split:
   strategy: time
   data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
@@ -589,12 +589,12 @@ split:
   checks:
     problems: []
     test_rows_with_copy_in_train: 0
-  run_at: '2026-10-20T23:04:40'
+  run_at: '2026-10-21T13:16:29'
   mlflow:
-    run_id: 674251fab9fc433d91bba3f65778cf74
+    run_id: a396382a63f04ff4912894e7c4bf2915
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/674251fab9fc433d91bba3f65778cf74
-    logged_at: '2026-10-20T23:04:42'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/a396382a63f04ff4912894e7c4bf2915
+    logged_at: '2026-10-21T13:16:32'
 features:
   config:
     numeric:
@@ -939,12 +939,12 @@ features:
     problems:
       - 'Large drift between training and test: temperature_2m_min_lag_2d, temperature_2m_mean_lag_2d, apparent_temperature_min_lag_2d,
         apparent_temperature_max_lag_2d.'
-  run_at: '2026-10-20T23:04:46'
+  run_at: '2026-10-21T13:16:37'
   mlflow:
-    run_id: 7403c1f16d964582bba8f9d0c24735f1
+    run_id: ad994965674d4b60819939f9d065061c
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/7403c1f16d964582bba8f9d0c24735f1
-    logged_at: '2026-10-20T23:04:47'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/ad994965674d4b60819939f9d065061c
+    logged_at: '2026-10-21T13:16:39'
 baseline:
   metrics:
     primary:
@@ -1007,12 +1007,12 @@ baseline:
     oof_predictions: data/processed/baseline_oof_predictions.parquet
   checks:
     problems: []
-  run_at: '2026-10-20T23:04:49'
+  run_at: '2026-10-21T13:16:44'
   mlflow:
-    run_id: 36328cf5fecf4ee091456caae1659fdd
+    run_id: a29766da35b84d939f06399a06f82cfb
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/36328cf5fecf4ee091456caae1659fdd
-    logged_at: '2026-10-20T23:04:50'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/a29766da35b84d939f06399a06f82cfb
+    logged_at: '2026-10-21T13:16:45'
 training:
   models:
     - name: ridge
@@ -1036,7 +1036,7 @@ training:
   settings:
     seed: 42
     selection: best_mean
-  data_version: c5fbc6c59e95
+  data_version: 16a68a33e055
   primary_label: mae
   leaderboard:
     - model: lightgbm
@@ -1044,7 +1044,7 @@ training:
       primary_mean: 2.163048
       primary_std: 0.23589
       trials: 20.0
-      minutes: 10.0
+      minutes: 10.9
       kind: ml
       vs reference %: 14.0
     - model: ridge
@@ -1052,7 +1052,7 @@ training:
       primary_mean: 2.230134
       primary_std: 0.250676
       trials: 20.0
-      minutes: 0.1
+      minutes: 0.2
       kind: ml
       vs reference %: 11.3
     - model: naive
@@ -1093,7 +1093,7 @@ training:
       subsample_freq: 1
     class_weight: null
     inputs: null
-    run_id: 148761002055-12
+    run_id: 5a3a59b19a98-12
     mae: 2.163048
     std: 0.23589
     vs_reference_pct: 14.0
@@ -1138,12 +1138,12 @@ training:
     problems: []
     train_score: 1.891419
     cv_score: 2.163048
-  run_at: '2026-10-20T23:15:44'
+  run_at: '2026-10-21T13:28:43'
   mlflow:
-    run_id: d886f600863949daa962460432a203af
+    run_id: 500337baa8064ae1925ae6b901796d0a
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/d886f600863949daa962460432a203af
-    logged_at: '2026-10-20T23:15:46'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/500337baa8064ae1925ae6b901796d0a
+    logged_at: '2026-10-21T13:28:46'
 evaluation:
   champion: lightgbm
   primary_label: mae
@@ -1929,6 +1929,9 @@ evaluation:
     - question: Was the test set used before?
       answer: The test set was opened on 2026-10-20T17:33:32 for champion lightgbm. The champion or the data changed
         since, so if that change followed the earlier test results, this test score is optimistic.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T23:16:09 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
   v1:
     cv:
       'on': cv
@@ -1999,13 +2002,16 @@ evaluation:
     - at: '2026-10-20T23:16:09'
       champion: lightgbm
       data_version: c5fbc6c59e95
+    - at: '2026-10-21T13:29:15'
+      champion: lightgbm
+      data_version: 16a68a33e055
   decision: null
-  run_at: '2026-10-20T23:16:09'
+  run_at: '2026-10-21T13:29:15'
   mlflow:
-    run_id: b4687f33c96346f2bea31c6ca2ed11be
+    run_id: e6c17520dc134794990e900753105847
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/b4687f33c96346f2bea31c6ca2ed11be
-    logged_at: '2026-10-20T23:16:10'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/e6c17520dc134794990e900753105847
+    logged_at: '2026-10-21T13:29:17'
 system:
   status: confirmed
   platform:
@@ -2694,6 +2700,45 @@ history:
   - at: '2026-10-21T12:54:19'
     skill: ml-reconcile-notes
     action: reconciled 1 notes
+  - at: '2026-10-21T13:16:29'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-21T13:16:29'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-21T13:16:30'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
+  - at: '2026-10-21T13:16:37'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-21T13:16:38'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-21T13:16:38'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-21T13:16:44'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-21T13:16:44'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
+  - at: '2026-10-21T13:28:43'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-21T13:28:44'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-21T13:29:15'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-21T13:29:15'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-21T13:43:34'
+    skill: ml-project-setup
+    action: fill root from tmpjs_w9lat.json
 version:
   current: V1
   branch: ml/v1

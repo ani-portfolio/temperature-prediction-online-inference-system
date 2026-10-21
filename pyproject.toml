@@ -2,9 +2,10 @@
 name = "16-weather-prediction"
 version = "0.1.0"
 description = "Forecast daily temperature for the coming days from historical weather data."
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "catboost>=1.2.10",
+    "hopsworks[python]>=5.2.1",
     "ipykernel>=7.4.0",
     "jinja2>=3.1.6",
     "lightgbm>=4.7.0",
@@ -14,8 +15,8 @@ dependencies = [
     "nbformat>=5.11.1",
     "numpy>=2.4.6",
     "optuna>=5.0.0",
-    "pandas>=3.0.6",
-    "pyarrow>=26.0.0",
+    "pandas>=2.3,<3",
+    "pyarrow<26",
     "pyyaml>=6.0.3",
     "scikit-learn>=1.9.1",
     "scipy>=1.17.1",
