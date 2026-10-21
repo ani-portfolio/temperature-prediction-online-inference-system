@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T21:44:29'
+  updated: '2026-10-20T21:57:28'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -502,8 +502,8 @@ notebooks:
     run_at: '2026-10-20T21:44:29'
   training:
     path: notebooks/08_training.ipynb
-    decisions_hash: 5b6d000bcc06b6b4
-    run_at: '2026-10-20T17:15:38'
+    decisions_hash: 68382b0a399510cd
+    run_at: '2026-10-20T21:57:28'
   evaluation:
     path: notebooks/09_evaluation.ipynb
     decisions_hash: 691949232f8b69a8
@@ -1028,28 +1028,81 @@ training:
         timeout_minutes: 10
       reason: Gradient boosting can learn interactions such as latitude with day of year, where seasons flip between
         hemispheres.
+    - name: lightgbm_iter0
+      type: lightgbm
+      params:
+        colsample_bytree: 0.881961
+        learning_rate: 0.012874
+        min_child_samples: 88
+        n_estimators: 700
+        num_leaves: 40
+        reg_lambda: 0.004712
+        subsample: 0.533786
+        subsample_freq: 1
+      class_weight: null
+      tuning:
+        n_trials: 1
+      inputs:
+        - apparent_temperature_max_lag_2d
+        - apparent_temperature_min_lag_2d
+        - city
+        - date_dayofyear
+        - date_month
+        - elevation
+        - latitude
+        - log_elevation
+        - longitude
+        - precipitation_sum_lag_2d
+        - shortwave_radiation_sum_lag_2d
+        - snowfall_sum_lag_2d
+        - sunshine_duration_lag_2d
+        - temp_max_change_1d
+        - temp_max_vs_28d_mean
+        - temperature_2m_max_lag_2d
+        - temperature_2m_max_lag_364d
+        - temperature_2m_max_lag_3d
+        - temperature_2m_max_lag_7d
+        - temperature_2m_max_roll_28d_mean_shift_2d
+        - temperature_2m_max_roll_7d_mean_shift_2d
+        - temperature_2m_mean_lag_2d
+        - temperature_2m_min_lag_2d
+        - weather_code_lag_2d
+        - wind_direction_10m_dominant_lag_2d
+        - wind_gusts_10m_max_lag_2d
+        - wind_speed_10m_max_lag_2d
+      reason: The champion of iteration 0, carried forward with its tuned settings fixed, so it is scored on the
+        same folds and features as the new models. Its city is target encoded under the V2 features, so it isolates
+        the encoding effect at fixed settings.
   settings:
     seed: 42
     selection: best_mean
-  data_version: 03f76d78ab4a
+  data_version: b77122beb607
   primary_label: mae
   leaderboard:
-    - model: lightgbm
+    - model: lightgbm_iter0
       type: lightgbm
-      primary_mean: 2.163048
-      primary_std: 0.23589
-      trials: 20.0
-      minutes: 10.4
+      primary_mean: 2.163734
+      primary_std: 0.233525
+      trials: 1.0
+      minutes: 0.5
       kind: ml
       vs reference %: 14.0
+    - model: lightgbm
+      type: lightgbm
+      primary_mean: 2.164778
+      primary_std: 0.233851
+      trials: 20.0
+      minutes: 10.5
+      kind: ml
+      vs reference %: 13.9
     - model: ridge
       type: ridge
-      primary_mean: 2.230134
-      primary_std: 0.250676
+      primary_mean: 2.24404
+      primary_std: 0.244693
       trials: 20.0
-      minutes: 0.1
+      minutes: 0.2
       kind: ml
-      vs reference %: 11.3
+      vs reference %: 10.8
     - model: naive
       type: non ML
       primary_mean: 2.515648
@@ -1075,7 +1128,7 @@ training:
       kind: baseline
       vs reference %: -32.3
   champion:
-    name: lightgbm
+    name: lightgbm_iter0
     type: lightgbm
     params:
       colsample_bytree: 0.881961
@@ -1087,10 +1140,37 @@ training:
       subsample: 0.533786
       subsample_freq: 1
     class_weight: null
-    inputs: null
-    run_id: 3e1d937d9c18-12
-    mae: 2.163048
-    std: 0.23589
+    inputs:
+      - apparent_temperature_max_lag_2d
+      - apparent_temperature_min_lag_2d
+      - city
+      - date_dayofyear
+      - date_month
+      - elevation
+      - latitude
+      - log_elevation
+      - longitude
+      - precipitation_sum_lag_2d
+      - shortwave_radiation_sum_lag_2d
+      - snowfall_sum_lag_2d
+      - sunshine_duration_lag_2d
+      - temp_max_change_1d
+      - temp_max_vs_28d_mean
+      - temperature_2m_max_lag_2d
+      - temperature_2m_max_lag_364d
+      - temperature_2m_max_lag_3d
+      - temperature_2m_max_lag_7d
+      - temperature_2m_max_roll_28d_mean_shift_2d
+      - temperature_2m_max_roll_7d_mean_shift_2d
+      - temperature_2m_mean_lag_2d
+      - temperature_2m_min_lag_2d
+      - weather_code_lag_2d
+      - wind_direction_10m_dominant_lag_2d
+      - wind_gusts_10m_max_lag_2d
+      - wind_speed_10m_max_lag_2d
+    run_id: 69c6be628e96-0
+    mae: 2.163734
+    std: 0.233525
     vs_reference_pct: 14.0
     beats_best_baseline: true
     v1_bar_met: true
@@ -1102,43 +1182,43 @@ training:
           kind: pct_over_reference
           status: pass
           detail: +14.0% against naive, needs 10%.
-    path: models/champion_lightgbm.joblib
+    path: models/champion_lightgbm_iter0.joblib
     serialization: cloudpickle_by_value
   top_features:
     - feature: temperature_2m_max_lag_2d
-      importance: 2.00091
+      importance: 2.01371
     - feature: temperature_2m_max_roll_7d_mean_shift_2d
-      importance: 1.90414
+      importance: 1.83067
     - feature: temperature_2m_max_roll_28d_mean_shift_2d
-      importance: 0.93015
+      importance: 0.83044
     - feature: shortwave_radiation_sum_lag_2d
-      importance: 0.18567
+      importance: 0.20338
     - feature: apparent_temperature_max_lag_2d
-      importance: 0.12772
-    - feature: temperature_2m_max_lag_364d
-      importance: 0.08384
+      importance: 0.12787
+    - feature: city
+      importance: 0.10781
     - feature: temperature_2m_mean_lag_2d
-      importance: 0.08303
-    - feature: latitude
-      importance: 0.07385
+      importance: 0.08484
+    - feature: temperature_2m_max_lag_364d
+      importance: 0.07061
     - feature: temperature_2m_max_lag_7d
-      importance: 0.06303
+      importance: 0.06243
     - feature: apparent_temperature_min_lag_2d
-      importance: 0.045
+      importance: 0.03882
   files:
     runs: data/processed/training_runs.parquet
     oof_predictions: data/processed/training_oof_predictions.parquet
-    champion_model: models/champion_lightgbm.joblib
+    champion_model: models/champion_lightgbm_iter0.joblib
   checks:
     problems: []
-    train_score: 1.891419
-    cv_score: 2.163048
-  run_at: '2026-10-20T17:15:38'
+    train_score: 1.88904
+    cv_score: 2.163734
+  run_at: '2026-10-20T21:57:27'
   mlflow:
-    run_id: 334a6392ab9b4bcc8a16900da37f2a07
+    run_id: 97f98df0f43a4cfaaf7d4f782460643a
     experiment_id: '5'
-    url: http://127.0.0.1:5000/#/experiments/5/runs/334a6392ab9b4bcc8a16900da37f2a07
-    logged_at: '2026-10-20T17:15:39'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/97f98df0f43a4cfaaf7d4f782460643a
+    logged_at: '2026-10-20T21:57:30'
 evaluation:
   champion: lightgbm
   primary_label: mae
@@ -2042,6 +2122,48 @@ iterations:
       version: V2
       previous_version: V1
       mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+      carried_forward:
+        name: lightgbm_iter0
+        type: lightgbm
+        params:
+          colsample_bytree: 0.881961
+          learning_rate: 0.012874
+          min_child_samples: 88
+          n_estimators: 700
+          num_leaves: 40
+          reg_lambda: 0.004712
+          subsample: 0.533786
+          subsample_freq: 1
+        inputs:
+          - apparent_temperature_max_lag_2d
+          - apparent_temperature_min_lag_2d
+          - city
+          - date_dayofyear
+          - date_month
+          - elevation
+          - latitude
+          - log_elevation
+          - longitude
+          - precipitation_sum_lag_2d
+          - shortwave_radiation_sum_lag_2d
+          - snowfall_sum_lag_2d
+          - sunshine_duration_lag_2d
+          - temp_max_change_1d
+          - temp_max_vs_28d_mean
+          - temperature_2m_max_lag_2d
+          - temperature_2m_max_lag_364d
+          - temperature_2m_max_lag_3d
+          - temperature_2m_max_lag_7d
+          - temperature_2m_max_roll_28d_mean_shift_2d
+          - temperature_2m_max_roll_7d_mean_shift_2d
+          - temperature_2m_mean_lag_2d
+          - temperature_2m_min_lag_2d
+          - weather_code_lag_2d
+          - wind_direction_10m_dominant_lag_2d
+          - wind_gusts_10m_max_lag_2d
+          - wind_speed_10m_max_lag_2d
+        usable: true
+        missing: []
   bar:
     min_fold_win_share: 0.5
     spread_multiple: 1.0
@@ -2153,6 +2275,11 @@ decisions:
     decision: 'Iteration 1 (V2): city and country are target encoded for both ridge and LightGBM; country is no
       longer excluded.'
     reason: The user asked to test whether a learned level per city and country beats one hot and ordinal codes.
+  - date: '2026-10-20'
+    stage: training
+    decision: 'Iteration 1 (V2): retrain ridge and LightGBM (20 trials each) on target encoded city and country,
+      plus lightgbm_iter0 with the V1 settings fixed.'
+    reason: 'The plan agreed in ml-iterate: compare the new encoding against the V1 champion on the same folds.'
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2289,6 +2416,18 @@ history:
   - at: '2026-10-20T21:44:29'
     skill: ml-baseline-model
     action: ran 07_baseline.ipynb
+  - at: '2026-10-20T21:44:34'
+    skill: ml-iterate
+    action: recorded the carried forward champion for iteration 1
+  - at: '2026-10-20T21:45:25'
+    skill: ml-iterate
+    action: recorded the carried forward champion for iteration 1
+  - at: '2026-10-20T21:57:27'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T21:57:28'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
 version:
   current: V2
   branch: ml/v2
