@@ -1,6 +1,3 @@
-# Shared spec for this ML project. Each skill reads it first and writes only its own section.
-# You can edit it by hand. Keep the keys, and use null for anything not known yet.
-# Field meanings: reference/spec_fields.md in any of the ML project skills.
 spec_version: 1
 project:
   name: 16_weather_prediction
@@ -10,7 +7,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-20T17:33:32'
+  updated: '2026-10-20T22:06:01'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -1990,7 +1987,125 @@ evaluation:
 system: {}
 iterations:
   current: null
-  entries: []
+  entries:
+    - id: 1
+      opened_at: '2026-10-20T21:42:03'
+      hypothesis: Target-encoding city and country gives both models a meaningful number for each place's typical
+        temperature level in place of 50 one-hot columns (ridge) or arbitrary integer codes (LightGBM), and pools
+        the cities within a country, which should lower CV MAE against the V1 LightGBM carried forward on the same
+        folds.
+      diagnosis:
+        - The V1 LightGBM champion beats persistence by 14.9% on test (2.080 against 2.443), and ridge is close
+          behind (2.146).
+        - City is ordinal-encoded for LightGBM (arbitrary codes) and one-hot for ridge (50 columns); it is not among
+          the top 10 features.
+        - Country is excluded as redundant with city, though 6 of 36 countries have more than one city (United States
+          9).
+        - Weak slices are high latitude cities; drift between training and test comes from the seasons, and test
+          bias is near zero.
+      changes:
+        - stage: features
+          change: Move city from categorical to high_cardinality and bring country back from the excluded list as
+            high_cardinality, so both the linear (ridge) and tree (LightGBM) preprocessors target-encode city and
+            country with sklearn's TargetEncoder, fitted inside each CV fold.
+        - stage: training
+          change: Retrain ridge and LightGBM with the same tuning budget (20 trials each), plus the V1 LightGBM
+            carried forward with its tuned settings fixed.
+      rerun:
+        - features
+        - baseline
+        - training
+        - evaluation
+      start:
+        champion: lightgbm
+        type: lightgbm
+        cv: 2.163048
+        cv_std: 0.23589
+        test: 2.079935
+        test_look: 2
+        data_version: 03f76d78ab4a
+        metric: mae
+      snapshot: iterations/iter_0
+      status: closed
+      start_hashes:
+        features_config: 5cf6a9dcce2a
+        custom_features: df0eb8ea531a
+        split_cv: ef812cfee9a0
+      version: V2
+      previous_version: V1
+      mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+      carried_forward:
+        name: lightgbm_iter0
+        type: lightgbm
+        params:
+          colsample_bytree: 0.881961
+          learning_rate: 0.012874
+          min_child_samples: 88
+          n_estimators: 700
+          num_leaves: 40
+          reg_lambda: 0.004712
+          subsample: 0.533786
+          subsample_freq: 1
+        inputs:
+          - apparent_temperature_max_lag_2d
+          - apparent_temperature_min_lag_2d
+          - city
+          - date_dayofyear
+          - date_month
+          - elevation
+          - latitude
+          - log_elevation
+          - longitude
+          - precipitation_sum_lag_2d
+          - shortwave_radiation_sum_lag_2d
+          - snowfall_sum_lag_2d
+          - sunshine_duration_lag_2d
+          - temp_max_change_1d
+          - temp_max_vs_28d_mean
+          - temperature_2m_max_lag_2d
+          - temperature_2m_max_lag_364d
+          - temperature_2m_max_lag_3d
+          - temperature_2m_max_lag_7d
+          - temperature_2m_max_roll_28d_mean_shift_2d
+          - temperature_2m_max_roll_7d_mean_shift_2d
+          - temperature_2m_mean_lag_2d
+          - temperature_2m_min_lag_2d
+          - weather_code_lag_2d
+          - wind_direction_10m_dominant_lag_2d
+          - wind_gusts_10m_max_lag_2d
+          - wind_speed_10m_max_lag_2d
+        usable: true
+        missing: []
+      closed_at: '2026-10-20T22:06:00'
+      outcome: rolled_back
+      reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+        2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+        2.2301). The iteration bar failed, so V1 stays.'
+      end:
+        champion: lightgbm_iter0
+        type: lightgbm
+        cv: 2.163734
+        cv_std: 0.233525
+        test: null
+        test_look: 2
+        data_version: b77122beb607
+        metric: mae
+        folds: ef812cfee9a0
+        carried_forward_cv: 2.163734
+      not_rerun:
+        - evaluation
+      bar_result:
+        status: fail
+        wins: 0
+        folds: null
+        mean_diff: null
+        spread: null
+        detail: The carried champion lightgbm_iter0 is still the best model, so no new model beat it.
+  bar:
+    min_fold_win_share: 0.5
+    spread_multiple: 1.0
+    min_folds: 3
+    max_iterations: 3
 autopilot: {}
 assumptions:
   - The forecast is for the next day only (horizon of one day), for the daily maximum temperature at 2 m.
@@ -2081,6 +2196,12 @@ decisions:
     reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
       on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over
       26 weeks. This matches the answer action for beating persistence by 10% or more.
+  - date: '2026-10-20'
+    stage: iteration
+    decision: 'Closed iteration 1 (V2): rolled back.'
+    reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+      2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+      2.2301). The iteration bar failed, so V1 stays.'
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2199,10 +2320,34 @@ history:
   - at: '2026-10-20T17:33:32'
     skill: ml-offline-evaluation
     action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T22:06:01'
+    skill: ml-iterate
+    action: closed iteration 1 (rolled_back)
 version:
   current: V1
   branch: ml/v1
-  history: []
+  history:
+    - version: V1
+      branch: ml/v1
+      status: kept
+      champion: lightgbm
+      cv: 2.163048
+      test: 2.079935
+      git_tag: v1
+    - version: V2
+      branch: ml/v2
+      status: rolled_back
+      closed_at: '2026-10-20T22:06:02'
+      reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+        2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+        2.2301). The iteration bar failed, so V1 stays.'
+      champion: lightgbm_iter0
+      cv: 2.163734
+      test: null
+      mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+      git_tag: v2-rolled-back
+  previous: V1
+  mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
 git:
   auto_commit: true
 tracking:
