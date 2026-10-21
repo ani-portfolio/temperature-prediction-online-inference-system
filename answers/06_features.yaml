@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-feature-engineering
 stage: features
-saved_at: '2026-10-20T14:26:30'
+saved_at: '2026-10-20T21:43:49'
 command:
   - make_notebook.py
-  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/features.yaml
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/683f2268-5c09-4ec9-9f78-5bd6ce90f82b/scratchpad/features_v2.yaml
 answers:
   config:
     numeric:
@@ -14,9 +14,10 @@ answers:
       - elevation
       - temp_max_change_1d
       - temp_max_vs_28d_mean
-    categorical:
+    categorical: []
+    high_cardinality:
       - city
-    high_cardinality: []
+      - country
     date_parts:
       date:
         - dayofyear
@@ -101,7 +102,6 @@ answers:
     date: the prediction date itself; its calendar parts are used instead
     grid_latitude: redundant with latitude (Spearman 1.00)
     grid_longitude: redundant with longitude (Spearman 1.00)
-    country: redundant with city
     timezone: redundant with city and country (Cramer's V 1.00)
     rain_sum: same day value; its lag is left out too, almost identical to precipitation_sum (0.98)
     temperature_2m_min: same day value on the target date, known only after the outcome; used only as a lag of 2
@@ -127,7 +127,7 @@ answers:
       days
     weather_code: same day value on the target date, known only after the outcome; used only as a lag of 2 days
   feature_reasons:
-    city: 'category, 50 values: lets the model learn each city''s level'
+    city: '50 values, target encoded: a learned number for each city''s typical level (V2 change)'
     latitude: 'static: hemisphere and climate band'
     longitude: 'static: location'
     elevation: 'static: altitude lowers temperature'
@@ -155,6 +155,7 @@ answers:
     shortwave_radiation_sum_lag_2d: shortwave_radiation_sum on the last complete day (2 days before the target)
     sunshine_duration_lag_2d: sunshine_duration on the last complete day (2 days before the target)
     weather_code_lag_2d: weather_code on the last complete day (2 days before the target)
+    country: '36 values, target encoded: pools cities within a country, such as the 9 in the United States (V2 change)'
   leakage_threshold: 0.9
   confirmed_safe:
     - temperature_2m_max_roll_7d_mean_shift_2d
@@ -164,16 +165,19 @@ answers:
     - apparent_temperature_max_lag_2d
     - temperature_2m_max_lag_3d
   reasoning:
-    inputs: Static location columns are known at any time; city lets the model learn each city's level. Redundant
-      columns (grid coordinates, country, timezone) are left out. Every same day weather column is on the target
-      date, so it would leak the outcome; each is used only as a lag of 2 days.
+    inputs: Static location columns are known at any time; city lets the model learn each city's level. Country
+      comes back as a second location column (V2). Redundant columns (grid coordinates, timezone) are left out.
+      Every same day weather column is on the target date, so it would leak the outcome; each is used only as a
+      lag of 2 days.
     steps: Lags 2 and 3 of the target are persistence and the recent trend, lag 7 a weekly view, and lag 364 the
       seasonal anchor. Rolling means over 7 and 28 days end on the last complete day. Two custom features compare
       the last complete day with the day before and with its 28 day mean.
     history: Every lag and window ends at least 2 days before the target date, the horizon set in the framing, because
       requests arrive while the current day is incomplete. Lag 364 is empty for 2024.
-    encoding: city is one hot encoded for linear models and ordinal coded for trees, fitted inside each fold. Missing
-      lag values are imputed with the median and flagged for linear models; trees use them as missing.
+    encoding: city and country are target encoded with sklearn's TargetEncoder for both linear and tree models (V2
+      change from one hot for linear and ordinal codes for trees), fitted inside each fold with internal cross fitting,
+      so a row's own target never feeds its encoding; the linear preprocessor also scales them. Missing lag values
+      are imputed with the median and flagged for linear models; trees use them as missing.
   risks:
     - problem: The suggested inputs used the same day weather columns, and logs of them, on the target row, which
         would leak the outcome.
@@ -185,6 +189,10 @@ answers:
     - problem: Large drift between training and test in the 2 day lags of temperature_2m_min and apparent_temperature_min.
       resolution: 'Expected: the test period is April to September only, while training covers every season. Watch
         the test score by month in the evaluation.'
+    - problem: Target encoding replaces each city's one hot intercept (ridge) with a single number, and country
+        mostly repeats city (only 6 of 36 countries have more than one city).
+      resolution: Tested in iteration 1 (V2) against the V1 LightGBM carried forward on the same folds; kept only
+        if it passes the iteration bar.
   assumptions:
     - The archive's values for past days do not change after they are first published.
   open_questions: []
@@ -197,6 +205,9 @@ answers:
         of temperature_2m_mean and apparent_temperature_max, despite associations above 0.9.'
       reason: Each ends at least 2 days before the target date (min_shift_days = 2, enforced by the feature code);
         temperature is persistent, so a high association is expected. Lag 2 is the persistence forecast itself.
+    - decision: 'Iteration 1 (V2): city and country are target encoded for both ridge and LightGBM; country is no
+        longer excluded.'
+      reason: The user asked to test whether a learned level per city and country beats one hot and ordinal codes.
   resolved_questions:
     - id: Q3
       answer: temperature_2m_mean is known only 2 or more days later; it is used only as a 2 day lag.
