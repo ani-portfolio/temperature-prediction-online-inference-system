@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-21T12:50:50'
+  updated: '2026-10-21T12:54:01'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2007,7 +2007,7 @@ evaluation:
     url: http://127.0.0.1:5000/#/experiments/5/runs/b4687f33c96346f2bea31c6ca2ed11be
     logged_at: '2026-10-20T23:16:10'
 system:
-  status: draft
+  status: confirmed
   platform:
     kind: platform
     name: hopsworks
@@ -2228,8 +2228,8 @@ system:
     - problem: With prod only, every deployment change is first exercised live.
       resolution: Component tests run against a separate Hopsworks test project.
   doc: docs/system_design.md
-  run_at: '2026-10-21T12:50:49'
-  doc_hash: bc556ee4b68ea907
+  run_at: '2026-10-21T12:54:01'
+  doc_hash: a0fed2ee8177d9c2
 iterations:
   current: null
   entries:
@@ -2680,6 +2680,12 @@ history:
     skill: ml-system-design
     action: wrote system from its notebook
   - at: '2026-10-21T12:50:50'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-21T12:54:01'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-21T12:54:01'
     skill: ml-system-design
     action: wrote docs/system_design.md
 version:

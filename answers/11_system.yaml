@@ -2,12 +2,12 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-21T12:50:50'
+saved_at: '2026-10-21T12:54:01'
 command:
   - design.py
-  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/683f2268-5c09-4ec9-9f78-5bd6ce90f82b/scratchpad/system_answers_draft.yaml
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/683f2268-5c09-4ec9-9f78-5bd6ce90f82b/scratchpad/system_answers.yaml
 answers:
-  status: draft
+  status: confirmed
   platform:
     kind: platform
     name: hopsworks
