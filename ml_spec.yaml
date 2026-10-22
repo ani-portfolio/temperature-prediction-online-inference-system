@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-22T14:44:23'
+  updated: '2026-10-22T14:44:48'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2430,7 +2430,10 @@ open_questions:
       tests?
     stage: system
     raised_by: ml-system-design
-    status: open
+    status: resolved
+    answer: 'Hopsworks Serverless (eu-west), project weather_online_inference. There is no test project: the user
+      dropped component tests, and CI runs unit tests only (including the skew test on a committed fixture), with
+      a smoke check after every deploy. Recorded in docs/system_design.md (orchestration, testing) and docs/deployment.md.'
 decisions:
   - date: '2026-10-20'
     stage: business
@@ -2780,6 +2783,9 @@ history:
   - at: '2026-10-22T14:44:23'
     skill: ml-system-design
     action: wrote docs/system_design.md
+  - at: '2026-10-22T14:44:48'
+    skill: ml-reconcile-notes
+    action: reconciled 1 notes
 version:
   current: V1
   branch: ml/v1
