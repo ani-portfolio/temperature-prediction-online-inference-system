@@ -1,0 +1,2779 @@
+# Shared spec for this ML project. Each skill reads it first and writes only its own section.
+# You can edit it by hand. Keep the keys, and use null for anything not known yet.
+# Field meanings: reference/spec_fields.md in any of the ML project skills.
+spec_version: 1
+project:
+  name: 16_weather_prediction
+  description: Forecast daily temperature for the coming days from historical weather data.
+  owner: null
+  python: 3.11.8
+  kernel: 16_weather_prediction
+  kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
+  created: '2026-10-20T12:00:53'
+  updated: '2026-10-21T13:43:34'
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  notebooks: notebooks
+  src: src
+  models: models
+  docs: docs
+  pipelines:
+    feature: src/feature_pipeline
+    training: src/training_pipeline
+    inference: src/inference_pipeline
+    monitoring: src/monitoring_pipeline
+business:
+  status: confirmed
+  mode: exploratory
+  learning_question: Can I build an end to end online inference system (feature store, champion/challenger gate,
+    monitoring) that serves next day maximum temperature forecasts for 50 cities, with a model that beats a simple
+    persistence forecast (tomorrow's maximum equals the last complete day's maximum)?
+  answer_actions:
+    - answer: The model clearly beats persistence (for example 10% or more lower error).
+      action: Promote it as champion, build the full serving stack around it, and use the gate to judge later challengers.
+    - answer: The model only matches persistence.
+      action: Still build the system, but serve the persistence forecast as the first champion, then try richer
+        features (lags from nearby cities, hourly data) as challengers.
+    - answer: The model is worse than persistence.
+      action: Look for leakage or a flawed setup first, and ship nothing until it is explained.
+  business_goal: null
+  business_kpi: null
+  decision_supported: null
+  users: The project owner, who builds the system and takes the answer action; portfolio readers see the result
+    but do not act on the forecasts.
+  capacity: null
+  current_approach: null
+  outcome: Each city's maximum air temperature (2 m, degrees Celsius) for its next local calendar day, predicted
+    whenever a request arrives, from that city's weather up to and including the last complete day (normally yesterday).
+  output_use: quantity
+  v1_bar_intent: Beat the best simple baseline (persistence from the last complete day) by at least 10% lower error
+    on CV, then promote the model as champion and build the serving stack around it.
+  ml_needed: unsure
+  ml_needed_reason: That is what the experiment should find out; a persistence or seasonal baseline may already
+    come close.
+  constraints:
+    latency: Online, on request. Forecasts are served when a request arrives, not as a nightly batch.
+    interpretability: null
+    fairness: null
+    data_access: Open-Meteo free tier only (non commercial, no API key, per minute, hourly, and daily request limits).
+    other:
+      - Only the 50 cities in the snapshot; requests for other locations are out of scope in V1.
+  out_of_scope:
+    - Competing with professional weather forecasts, which use numerical weather models this project does not.
+    - Locations other than the 50 cities.
+    - Forecasts beyond the next day.
+  risks:
+    - problem: The first draft of the goal was only "build the system end to end", which gives the gate and the
+        monitoring no quality bar.
+      resolution: The learning question now includes beating a persistence forecast.
+    - problem: The first draft assumed forecasts are made the evening before, but requests can arrive at any time,
+        when the current day is incomplete.
+      resolution: Inputs stop at the last complete day, and training must copy that one day gap so offline results
+        match what the live system can do.
+    - problem: The model uses only past weather at each city, so it will be far less accurate than professional
+        forecasts.
+      resolution: Recorded as out of scope; the comparison that matters is against persistence.
+discovery:
+  run_at: '2026-10-20T23:04:27'
+  notebook: notebooks/02_data_discovery.ipynb
+  dictionary: docs/data_dictionary.yaml
+  main_source: weather
+  sources:
+    - name: weather
+      path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+      description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01
+        to 2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station
+        observations. Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
+      rows: 50250
+      columns: 23
+      duplicate_rows: 0
+      grain:
+        type: pair
+        columns:
+          - date
+          - city
+        other_unique_pairs: []
+      entity_id_candidates:
+        - column: city
+          distinct: 50
+          rows_per_value: 1005.0
+      date_columns:
+        - column: date
+          min: '2024-01-01'
+          max: '2026-10-01'
+          span_days: 1004
+          missing_pct: 0.0
+      main_date: date
+      history_days: 1004
+      days_since_last_date: 19
+      months_with_no_rows: []
+      thin_months:
+        - 2026-10
+      issues:
+        - severity: High
+          finding: ID column is not unique
+          count: 1
+        - severity: Medium
+          finding: Dates stored as text
+          count: 1
+        - severity: Low
+          finding: Highly correlated numeric pairs (|Spearman| ≥ 0.9)
+          count: 14
+        - severity: Low
+          finding: Highly skewed (absolute skew above 2)
+          count: 4
+        - severity: Low
+          finding: Many outliers (over 5% of rows by the IQR rule)
+          count: 4
+        - severity: Low
+          finding: Strongly associated categorical pairs (Cramér's V ≥ 0.8)
+          count: 1
+      issue_counts:
+        High: 1
+        Medium: 1
+        Low: 4
+  joins: []
+  dictionary_summary:
+    columns: 23
+    needs_review: 0
+    unclear_meaning: []
+    timing_unknown: []
+    possibly_after_outcome: []
+    candidate_targets: []
+    personal_data: []
+  framing_hints:
+    candidate_targets:
+      - column: wind_speed_10m_max
+        suggested_type: continuous
+        unique: 511
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_gusts_10m_max
+        suggested_type: continuous
+        unique: 295
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_direction_10m_dominant
+        suggested_type: continuous
+        unique: 361
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: city
+        suggested_type: categorical
+        unique: 50
+        missing_pct: 0.0
+        reasons:
+          - first column
+      - column: weather_code
+        suggested_type: categorical
+        unique: 13
+        missing_pct: 0.0
+        reasons:
+          - last column
+    grain:
+      type: pair
+      columns:
+        - date
+        - city
+      other_unique_pairs: []
+    entity_id_candidates:
+      - column: city
+        distinct: 50
+        rows_per_value: 1005.0
+    date_columns:
+      - column: date
+        min: '2024-01-01'
+        max: '2026-10-01'
+        span_days: 1004
+        missing_pct: 0.0
+    main_date: date
+    history_days: 1004
+    post_outcome_suspects: []
+framing:
+  status: confirmed
+  task_type: forecasting
+  target:
+    name: temperature_2m_max
+    definition: The city's maximum air temperature at 2 m (degrees Celsius) on the target date, its local calendar
+      day.
+    positive_class: null
+    outcome_window: The single target day, two days after the last day the inputs may use
+    exists_in_data: true
+    construction: null
+    label_delay: 1 day (known once the target day is complete and in the archive)
+  unit_of_prediction: One city on one target date (the city's next local day, seen from a request)
+  entity_id_cols:
+    - city
+  population: All 50 cities in the snapshot, every day
+  prediction_time:
+    description: Whenever a request arrives during the day before the target date. The current day is incomplete,
+      so inputs stop at the last complete day, two days before the target date.
+    column: date
+    feature_cutoff: End of the local day two days before the target date (the last complete day)
+    cadence: Online, on request
+    horizon: 2 days
+  success:
+    primary_metric: MAE
+    secondary_metrics:
+      - RMSE
+      - mean error (bias)
+    v1_bar: MAE at least 10% lower than the best simple baseline (persistence, seasonal naive, or moving average)
+      on CV, and still lower than it on the test set
+    v1_criteria:
+      - id: beats_best_baseline_cv
+        kind: pct_over_reference
+        pct: 10
+        'on': cv
+      - id: beats_best_baseline_test
+        kind: pct_over_reference
+        pct: 0
+        'on': test
+    guardrails: []
+  risks:
+    - problem: The first draft used date as the last complete day with a shifted target, which later stages would
+        not guard.
+      resolution: Switched to the forecasting layout (target date rows, horizon 2 days), which the feature and baseline
+        stages handle natively.
+data:
+  sources:
+    - name: weather
+      path: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+      rows: 50250
+      columns: 23
+      description: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01
+        to 2026-10-01, one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station
+        observations. Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.
+  date_col: date
+  id_cols: []
+  excluded_cols: []
+eda:
+  mode: targeted
+  run_at: '2026-10-20T23:04:38'
+  source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  report: notebooks/04_eda_open_meteo_daily_2024_01_01_2026_10_01.ipynb
+  rows: 50250
+  columns: 23
+  sampled: false
+  grain:
+    type: pair
+    columns:
+      - date
+      - city
+    other_unique_pairs: []
+  duplicate_rows: 0
+  primary_date:
+    column: date
+    min: '2024-01-01'
+    max: '2026-10-01'
+  columns_by_role:
+    identifier:
+      - city
+    categorical:
+      - country
+      - timezone
+    numeric:
+      - latitude
+      - longitude
+      - grid_latitude
+      - grid_longitude
+      - elevation
+      - temperature_2m_min
+      - temperature_2m_mean
+      - apparent_temperature_max
+      - apparent_temperature_min
+      - precipitation_sum
+      - rain_sum
+      - snowfall_sum
+      - wind_speed_10m_max
+      - wind_gusts_10m_max
+      - wind_direction_10m_dominant
+      - shortwave_radiation_sum
+      - sunshine_duration
+      - weather_code
+    datetime_as_text:
+      - date
+  target:
+    column: temperature_2m_max
+    type: continuous
+    task: regression
+    missing_pct: 0.0
+    unique: 638
+    skew: -0.583
+  top_target_associations:
+    - feature: apparent_temperature_max
+      measure: Spearman
+      association: 0.9797
+      mutual_information: 1.8516
+    - feature: temperature_2m_mean
+      measure: Spearman
+      association: 0.9764
+      mutual_information: 1.6882
+    - feature: temperature_2m_min
+      measure: Spearman
+      association: 0.9142
+      mutual_information: 1.0252
+    - feature: apparent_temperature_min
+      measure: Spearman
+      association: 0.9007
+      mutual_information: 0.974
+    - feature: shortwave_radiation_sum
+      measure: Spearman
+      association: 0.6636
+      mutual_information: 0.3889
+    - feature: timezone
+      measure: Eta
+      association: 0.6568
+      mutual_information: 0.5776
+    - feature: country
+      measure: Eta
+      association: 0.6035
+      mutual_information: 0.5204
+    - feature: sunshine_duration
+      measure: Spearman
+      association: 0.5111
+      mutual_information: 0.2344
+    - feature: grid_latitude
+      measure: Spearman
+      association: -0.3824
+      mutual_information: 0.6038
+    - feature: latitude
+      measure: Spearman
+      association: -0.3817
+      mutual_information: 0.6093
+  leakage_suspects:
+    - column: temperature_2m_mean
+      reasons:
+        - association with the target is 0.976
+    - column: apparent_temperature_max
+      reasons:
+        - association with the target is 0.980
+  suggested_exclusions:
+    - column: city
+      reason: identifier
+    - column: temperature_2m_mean
+      reason: 'possible leakage: association with the target is 0.976'
+    - column: apparent_temperature_max
+      reason: 'possible leakage: association with the target is 0.980'
+  issues:
+    - severity: High
+      area: Target
+      finding: Possible leakage
+      action: Confirm the feature is available at prediction time, and drop it if it is not.
+      columns:
+        - temperature_2m_mean
+        - apparent_temperature_max
+    - severity: High
+      area: Keys and duplicates
+      finding: ID column is not unique
+      action: Check whether the data should have one row per ID, and look for a many to many join.
+      columns:
+        - city
+    - severity: Medium
+      area: Data types
+      finding: Dates stored as text
+      action: Convert with pd.to_datetime.
+      columns:
+        - date
+    - severity: Low
+      area: Relationships
+      finding: Highly correlated numeric pairs (|Spearman| ≥ 0.9)
+      action: Consider keeping only one of each pair for linear models, and check whether one is derived from the
+        other.
+      details: '`longitude` and `grid_longitude` (1.00), `latitude` and `grid_latitude` (1.00), `temperature_2m_min`
+        and `apparent_temperature_min` (0.99), `temperature_2m_mean` and `apparent_temperature_max` (0.98), `precipitation_sum`
+        and `rain_sum` (0.98), `temperature_2m_min` and `temperature_2m_mean` (0.97), `temperature_2m_mean` and
+        `apparent_temperature_min` (0.96), `apparent_temperature_max` and `apparent_temperature_min` (0.95), `temperature_2m_min`
+        and `apparent_temperature_max` (0.94), `precipitation_sum` and `weather_code` (0.92)'
+    - severity: Low
+      area: Numeric columns
+      finding: Highly skewed (absolute skew above 2)
+      action: Consider a log or rank transform for linear models.
+      columns:
+        - elevation
+        - precipitation_sum
+        - rain_sum
+        - snowfall_sum
+    - severity: Low
+      area: Numeric columns
+      finding: Many outliers (over 5% of rows by the IQR rule)
+      action: Check whether extreme values are real before capping them.
+      columns:
+        - elevation
+        - precipitation_sum
+        - rain_sum
+        - sunshine_duration
+    - severity: Low
+      area: Relationships
+      finding: Strongly associated categorical pairs (Cramér's V ≥ 0.8)
+      action: One of each pair may be redundant, or one may be a grouping of the other.
+      details: '`country` and `timezone` (1.00)'
+  missing_groups: []
+  framing_checks:
+    - check: Target column exists
+      status: pass
+      detail: '`temperature_2m_max` is in the data.'
+    - check: Target type matches the task type
+      status: pass
+      detail: '`temperature_2m_max` is continuous, as forecasting needs.'
+    - check: Rows per `city`
+      status: warn
+      detail: 50 distinct values over 50,250 rows, about 1005.0 rows each. Split by `city` or by time so the same
+        entity is not in both train and test.
+    - check: Grain matches the unit of prediction
+      status: pass
+      detail: 'Framing: One city on one target date (the city''s next local day, seen from a request). Every row
+        has a unique `city` + `date`, which matches.'
+    - check: Prediction time column exists
+      status: pass
+      detail: '`date` runs from 2024-01-01 to 2026-10-01.'
+    - check: Leakage suspects handled
+      status: warn
+      detail: 'Not yet excluded: `temperature_2m_mean`, `apparent_temperature_max`.'
+  framing_hints:
+    candidate_targets:
+      - column: wind_speed_10m_max
+        suggested_type: continuous
+        unique: 511
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_gusts_10m_max
+        suggested_type: continuous
+        unique: 295
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: wind_direction_10m_dominant
+        suggested_type: continuous
+        unique: 361
+        missing_pct: 0.0
+        reasons:
+          - name suggests an outcome
+          - continuous numeric
+      - column: city
+        suggested_type: categorical
+        unique: 50
+        missing_pct: 0.0
+        reasons:
+          - first column
+      - column: weather_code
+        suggested_type: categorical
+        unique: 13
+        missing_pct: 0.0
+        reasons:
+          - last column
+    grain:
+      type: pair
+      columns:
+        - date
+        - city
+      other_unique_pairs: []
+    entity_id_candidates:
+      - column: city
+        distinct: 50
+        rows_per_value: 1005.0
+    date_columns:
+      - column: date
+        min: '2024-01-01'
+        max: '2026-10-01'
+        span_days: 1004
+        missing_pct: 0.0
+    main_date: date
+    history_days: 1004
+    post_outcome_suspects: []
+notebooks:
+  business:
+    path: notebooks/01_business_framing.ipynb
+    decisions_hash: f773d00d4f9cf275
+    run_at: '2026-10-20T23:04:23'
+  discovery:
+    path: notebooks/02_data_discovery.ipynb
+    decisions_hash: a2a85030beea4cec
+    run_at: '2026-10-20T23:04:27'
+  framing:
+    path: notebooks/03_problem_framing.ipynb
+    decisions_hash: 682baa21186d9337
+    run_at: '2026-10-20T23:04:29'
+  split:
+    path: notebooks/05_split.ipynb
+    decisions_hash: fb5a4a3bb601827f
+    run_at: '2026-10-21T13:16:30'
+  features:
+    path: notebooks/06_features.ipynb
+    decisions_hash: d1974a0238859849
+    run_at: '2026-10-21T13:16:38'
+  baseline:
+    path: notebooks/07_baseline.ipynb
+    decisions_hash: 823dda73a2257506
+    run_at: '2026-10-21T13:16:44'
+  training:
+    path: notebooks/08_training.ipynb
+    decisions_hash: 5b6d000bcc06b6b4
+    run_at: '2026-10-21T13:28:44'
+  evaluation:
+    path: notebooks/09_evaluation.ipynb
+    decisions_hash: 188930d2a7e9117d
+    run_at: '2026-10-21T13:29:15'
+split:
+  strategy: time
+  data_source: data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  target: temperature_2m_max
+  task_type: forecasting
+  row_id_col: row_id
+  date_col: date
+  group_col: city
+  stratify: false
+  seed: 42
+  test:
+    rows: 9100
+    share: 0.1811
+    size: null
+    days: 182
+    start: '2026-04-03'
+    end: '2026-10-01'
+  gap_days: 0
+  cv:
+    method: time_backtest
+    n_folds: 4
+    window: expanding
+    valid_days: 91
+    train_days: null
+    folds:
+      - fold: 0
+        n_train: 22950
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-04-03'
+        valid_start: '2025-04-04'
+        valid_end: '2025-07-03'
+      - fold: 1
+        n_train: 27500
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-07-03'
+        valid_start: '2025-07-04'
+        valid_end: '2025-10-02'
+      - fold: 2
+        n_train: 32050
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2025-10-02'
+        valid_start: '2025-10-03'
+        valid_end: '2026-01-01'
+      - fold: 3
+        n_train: 36600
+        n_valid: 4550
+        train_start: '2024-01-01'
+        train_end: '2026-01-01'
+        valid_start: '2026-01-02'
+        valid_end: '2026-04-02'
+  duplicates:
+    handling: keep_together
+    rows: 0
+    dropped: 0
+  dropped:
+    missing_target: 0
+    unreadable_dates: 0
+  rows:
+    train: 41150
+    test: 9100
+    gap: 0
+  files:
+    train: data/processed/train.parquet
+    test: data/processed/test.parquet
+    folds: data/processed/cv_folds.parquet
+  checks:
+    problems: []
+    test_rows_with_copy_in_train: 0
+  run_at: '2026-10-21T13:16:29'
+  mlflow:
+    run_id: a396382a63f04ff4912894e7c4bf2915
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/a396382a63f04ff4912894e7c4bf2915
+    logged_at: '2026-10-21T13:16:32'
+features:
+  config:
+    numeric:
+      - latitude
+      - longitude
+      - elevation
+      - temp_max_change_1d
+      - temp_max_vs_28d_mean
+    categorical:
+      - city
+    high_cardinality: []
+    date_parts:
+      date:
+        - dayofyear
+        - month
+    days_since: []
+    log:
+      - elevation
+    ratios: []
+    lags:
+      - column: temperature_2m_max
+        days:
+          - 2
+          - 3
+          - 7
+          - 364
+        by: city
+      - column: temperature_2m_min
+        days:
+          - 2
+        by: city
+      - column: temperature_2m_mean
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_max
+        days:
+          - 2
+        by: city
+      - column: apparent_temperature_min
+        days:
+          - 2
+        by: city
+      - column: precipitation_sum
+        days:
+          - 2
+        by: city
+      - column: snowfall_sum
+        days:
+          - 2
+        by: city
+      - column: wind_speed_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_gusts_10m_max
+        days:
+          - 2
+        by: city
+      - column: wind_direction_10m_dominant
+        days:
+          - 2
+        by: city
+      - column: shortwave_radiation_sum
+        days:
+          - 2
+        by: city
+      - column: sunshine_duration
+        days:
+          - 2
+        by: city
+      - column: weather_code
+        days:
+          - 2
+        by: city
+    rolling:
+      - column: temperature_2m_max
+        windows:
+          - 7
+          - 28
+        stats:
+          - mean
+        shift_days: 2
+        by: city
+    custom: true
+    date_col: date
+    target: temperature_2m_max
+    min_shift_days: 2
+    target_min_shift_days: 2
+    rare_min_frequency: 0.01
+    exclude: []
+  inputs:
+    - name: latitude
+      kind: numeric
+      step: column
+      source: latitude
+      reason: 'static: hemisphere and climate band'
+    - name: longitude
+      kind: numeric
+      step: column
+      source: longitude
+      reason: 'static: location'
+    - name: elevation
+      kind: numeric
+      step: column
+      source: elevation
+      reason: 'static: altitude lowers temperature'
+    - name: temp_max_change_1d
+      kind: numeric
+      step: column
+      source: temp_max_change_1d
+      reason: 'custom: day over day change on the last complete day (lag 2 minus lag 3)'
+    - name: temp_max_vs_28d_mean
+      kind: numeric
+      step: column
+      source: temp_max_vs_28d_mean
+      reason: 'custom: last complete day against its 28 day mean, warmer than usual lately'
+    - name: date_dayofyear
+      kind: numeric
+      step: date_part
+      source: date
+      reason: smooth seasonal position of the target date
+    - name: date_month
+      kind: numeric
+      step: date_part
+      source: date
+      reason: coarse season of the target date
+    - name: log_elevation
+      kind: numeric
+      step: log
+      source: elevation
+      reason: log of elevation, which is strongly skewed (helps linear models)
+    - name: temperature_2m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: 'the last complete day''s maximum: persistence itself'
+    - name: temperature_2m_max_lag_3d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum a day before that, for the recent trend
+    - name: temperature_2m_max_lag_7d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum a week before the target
+    - name: temperature_2m_max_lag_364d
+      kind: numeric
+      step: lag
+      source: temperature_2m_max
+      reason: the maximum on the same date last year, a seasonal anchor (empty during 2024)
+    - name: temperature_2m_min_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_min
+      reason: temperature_2m_min on the last complete day (2 days before the target)
+    - name: temperature_2m_mean_lag_2d
+      kind: numeric
+      step: lag
+      source: temperature_2m_mean
+      reason: temperature_2m_mean on the last complete day (2 days before the target)
+    - name: apparent_temperature_max_lag_2d
+      kind: numeric
+      step: lag
+      source: apparent_temperature_max
+      reason: apparent_temperature_max on the last complete day (2 days before the target)
+    - name: apparent_temperature_min_lag_2d
+      kind: numeric
+      step: lag
+      source: apparent_temperature_min
+      reason: apparent_temperature_min on the last complete day (2 days before the target)
+    - name: precipitation_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: precipitation_sum
+      reason: precipitation_sum on the last complete day (2 days before the target)
+    - name: snowfall_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: snowfall_sum
+      reason: snowfall_sum on the last complete day (2 days before the target)
+    - name: wind_speed_10m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_speed_10m_max
+      reason: wind_speed_10m_max on the last complete day (2 days before the target)
+    - name: wind_gusts_10m_max_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_gusts_10m_max
+      reason: wind_gusts_10m_max on the last complete day (2 days before the target)
+    - name: wind_direction_10m_dominant_lag_2d
+      kind: numeric
+      step: lag
+      source: wind_direction_10m_dominant
+      reason: wind_direction_10m_dominant on the last complete day (2 days before the target)
+    - name: shortwave_radiation_sum_lag_2d
+      kind: numeric
+      step: lag
+      source: shortwave_radiation_sum
+      reason: shortwave_radiation_sum on the last complete day (2 days before the target)
+    - name: sunshine_duration_lag_2d
+      kind: numeric
+      step: lag
+      source: sunshine_duration
+      reason: sunshine_duration on the last complete day (2 days before the target)
+    - name: weather_code_lag_2d
+      kind: numeric
+      step: lag
+      source: weather_code
+      reason: weather_code on the last complete day (2 days before the target)
+    - name: temperature_2m_max_roll_7d_mean_shift_2d
+      kind: numeric
+      step: rolling
+      source: temperature_2m_max
+      reason: mean maximum over the week ending on the last complete day
+    - name: temperature_2m_max_roll_28d_mean_shift_2d
+      kind: numeric
+      step: rolling
+      source: temperature_2m_max
+      reason: mean maximum over the 28 days ending on the last complete day
+    - name: city
+      kind: categorical
+      step: column
+      source: city
+      reason: 'category, 50 values: lets the model learn each city''s level'
+  excluded:
+    - column: date
+      reason: the prediction date itself; its calendar parts are used instead
+    - column: grid_latitude
+      reason: redundant with latitude (Spearman 1.00)
+    - column: grid_longitude
+      reason: redundant with longitude (Spearman 1.00)
+    - column: country
+      reason: redundant with city
+    - column: timezone
+      reason: redundant with city and country (Cramer's V 1.00)
+    - column: rain_sum
+      reason: same day value; its lag is left out too, almost identical to precipitation_sum (0.98)
+    - column: temperature_2m_min
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: temperature_2m_mean
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: apparent_temperature_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: apparent_temperature_min
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: precipitation_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: snowfall_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_speed_10m_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_gusts_10m_max
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: wind_direction_10m_dominant
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: shortwave_radiation_sum
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: sunshine_duration
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+    - column: weather_code
+      reason: same day value on the target date, known only after the outcome; used only as a lag of 2 days
+  n_inputs: 27
+  outputs:
+    linear: 96
+    tree: 27
+  files:
+    train: data/processed/features_train.parquet
+    test: data/processed/features_test.parquet
+  code:
+    features: src/features.py
+    custom: src/custom_features.py
+    features_hash: 32c8d1bec95ed0b7
+  checks:
+    leakage_threshold: 0.9
+    strongest:
+      - feature: temperature_2m_max_roll_7d_mean_shift_2d
+        score: 0.9231
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: temperature_2m_max_lag_2d
+        score: 0.9205
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: temperature_2m_mean_lag_2d
+        score: 0.9163
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: temperature_2m_max_roll_28d_mean_shift_2d
+        score: 0.912
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: apparent_temperature_max_lag_2d
+        score: 0.9096
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: temperature_2m_max_lag_3d
+        score: 0.904
+        measure: '|Spearman|'
+        flagged: true
+        confirmed safe: true
+      - feature: temperature_2m_max_lag_7d
+        score: 0.8789
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: temperature_2m_max_lag_364d
+        score: 0.8761
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: temperature_2m_min_lag_2d
+        score: 0.8671
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+      - feature: apparent_temperature_min_lag_2d
+        score: 0.8513
+        measure: '|Spearman|'
+        flagged: false
+        confirmed safe: false
+    flagged: []
+    confirmed_safe:
+      - temperature_2m_max_roll_7d_mean_shift_2d
+      - temperature_2m_max_lag_2d
+      - temperature_2m_mean_lag_2d
+      - temperature_2m_max_roll_28d_mean_shift_2d
+      - apparent_temperature_max_lag_2d
+      - temperature_2m_max_lag_3d
+    drift_large:
+      - temperature_2m_min_lag_2d
+      - temperature_2m_mean_lag_2d
+      - apparent_temperature_min_lag_2d
+      - apparent_temperature_max_lag_2d
+    problems:
+      - 'Large drift between training and test: temperature_2m_min_lag_2d, temperature_2m_mean_lag_2d, apparent_temperature_min_lag_2d,
+        apparent_temperature_max_lag_2d.'
+  run_at: '2026-10-21T13:16:37'
+  mlflow:
+    run_id: ad994965674d4b60819939f9d065061c
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/ad994965674d4b60819939f9d065061c
+    logged_at: '2026-10-21T13:16:39'
+baseline:
+  metrics:
+    primary:
+      key: mae
+    secondary:
+      - rmse
+      - bias
+  primary_label: mae
+  models:
+    - name: naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_2d
+      reason: 'Persistence: tomorrow equals the last complete day''s maximum, 2 days before the target date. The
+        baseline the learning question names.'
+    - name: seasonal_naive
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_lag_364d
+      reason: The maximum on the same date last year (lag 364 days), the seasonal anchor.
+    - name: moving_average
+      kind: non_ml
+      type: column
+      params:
+        column: temperature_2m_max_roll_28d_mean_shift_2d
+      reason: The mean maximum over the 28 days ending on the last complete day.
+  results:
+    - model: naive
+      kind: non_ml
+      type: column
+      mae: 2.5156
+      rmse: 3.544
+      bias: 0.0051
+      mae std: 0.2686
+    - model: moving_average
+      kind: non_ml
+      type: column
+      mae: 2.774
+      rmse: 3.7704
+      bias: 0.0212
+      mae std: 0.3133
+    - model: seasonal_naive
+      kind: non_ml
+      type: column
+      mae: 3.327
+      rmse: 4.5368
+      bias: 0.0484
+      mae std: 0.523
+  reference:
+    name: naive
+    mae: 2.5156
+  best_non_ml:
+    name: naive
+    mae: 2.5156
+  best_vs_reference_pct: null
+  files:
+    cv_results: data/processed/baseline_cv_results.parquet
+    oof_predictions: data/processed/baseline_oof_predictions.parquet
+  checks:
+    problems: []
+  run_at: '2026-10-21T13:16:44'
+  mlflow:
+    run_id: a29766da35b84d939f06399a06f82cfb
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/a29766da35b84d939f06399a06f82cfb
+    logged_at: '2026-10-21T13:16:45'
+training:
+  models:
+    - name: ridge
+      type: ridge
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: 'The simple model first: it shows whether the lag, calendar, and location features beat persistence
+        without any complexity, and it is easy to explain.'
+    - name: lightgbm
+      type: lightgbm
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: Gradient boosting can learn interactions such as latitude with day of year, where seasons flip between
+        hemispheres.
+  settings:
+    seed: 42
+    selection: best_mean
+  data_version: 16a68a33e055
+  primary_label: mae
+  leaderboard:
+    - model: lightgbm
+      type: lightgbm
+      primary_mean: 2.163048
+      primary_std: 0.23589
+      trials: 20.0
+      minutes: 10.9
+      kind: ml
+      vs reference %: 14.0
+    - model: ridge
+      type: ridge
+      primary_mean: 2.230134
+      primary_std: 0.250676
+      trials: 20.0
+      minutes: 0.2
+      kind: ml
+      vs reference %: 11.3
+    - model: naive
+      type: non ML
+      primary_mean: 2.515648
+      primary_std: 0.268585
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: 0.0
+    - model: moving_average
+      type: non ML
+      primary_mean: 2.774013
+      primary_std: 0.313272
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: -10.3
+    - model: seasonal_naive
+      type: non ML
+      primary_mean: 3.327011
+      primary_std: 0.523032
+      trials: null
+      minutes: null
+      kind: baseline
+      vs reference %: -32.3
+  champion:
+    name: lightgbm
+    type: lightgbm
+    params:
+      colsample_bytree: 0.881961
+      learning_rate: 0.012874
+      min_child_samples: 88
+      n_estimators: 700
+      num_leaves: 40
+      reg_lambda: 0.004712
+      subsample: 0.533786
+      subsample_freq: 1
+    class_weight: null
+    inputs: null
+    run_id: 5a3a59b19a98-12
+    mae: 2.163048
+    std: 0.23589
+    vs_reference_pct: 14.0
+    beats_best_baseline: true
+    v1_bar_met: true
+    v1:
+      'on': cv
+      status: met
+      criteria:
+        - id: beats_best_baseline_cv
+          kind: pct_over_reference
+          status: pass
+          detail: +14.0% against naive, needs 10%.
+    path: models/champion_lightgbm.joblib
+    serialization: cloudpickle_by_value
+  top_features:
+    - feature: temperature_2m_max_lag_2d
+      importance: 2.00091
+    - feature: temperature_2m_max_roll_7d_mean_shift_2d
+      importance: 1.90414
+    - feature: temperature_2m_max_roll_28d_mean_shift_2d
+      importance: 0.93015
+    - feature: shortwave_radiation_sum_lag_2d
+      importance: 0.18567
+    - feature: apparent_temperature_max_lag_2d
+      importance: 0.12772
+    - feature: temperature_2m_max_lag_364d
+      importance: 0.08384
+    - feature: temperature_2m_mean_lag_2d
+      importance: 0.08303
+    - feature: latitude
+      importance: 0.07385
+    - feature: temperature_2m_max_lag_7d
+      importance: 0.06303
+    - feature: apparent_temperature_min_lag_2d
+      importance: 0.045
+  files:
+    runs: data/processed/training_runs.parquet
+    oof_predictions: data/processed/training_oof_predictions.parquet
+    champion_model: models/champion_lightgbm.joblib
+  checks:
+    problems: []
+    train_score: 1.891419
+    cv_score: 2.163048
+  run_at: '2026-10-21T13:28:43'
+  mlflow:
+    run_id: 500337baa8064ae1925ae6b901796d0a
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/500337baa8064ae1925ae6b901796d0a
+    logged_at: '2026-10-21T13:28:46'
+evaluation:
+  champion: lightgbm
+  primary_label: mae
+  metrics:
+    - model: lightgbm
+      kind: champion
+      test: 2.079935
+      low: 2.037591
+      high: 2.126922
+      cv: 2.163048
+      mae: 2.079935
+      rmse: 2.864287
+      bias: -0.057569
+    - model: ridge
+      kind: ml
+      test: 2.146029
+      low: 2.100505
+      high: 2.192244
+      cv: 2.230134
+      mae: 2.146029
+      rmse: 2.938281
+      bias: -0.156221
+    - model: naive
+      kind: baseline
+      test: 2.44344
+      low: 2.394443
+      high: 2.511231
+      cv: 2.5156
+      mae: 2.44344
+      rmse: 3.426404
+      bias: -0.042516
+    - model: seasonal_naive
+      kind: baseline
+      test: 3.235264
+      low: 3.174946
+      high: 3.306366
+      cv: 3.327
+      mae: 3.235264
+      rmse: 4.330351
+      bias: -0.306626
+    - model: moving_average
+      kind: baseline
+      test: 2.606646
+      low: 2.524669
+      high: 2.674462
+      cv: 2.774
+      mae: 2.606646
+      rmse: 3.603282
+      bias: -0.432332
+  comparisons:
+    - comparison: lightgbm against naive
+      difference: 0.363505
+      low: 0.322788
+      high: 0.405795
+      relative %: 14.876765
+  operating_point: null
+  slices:
+    - slice: city
+      value: Addis Ababa
+      rows: 182
+      target mean: 22.6912
+      champion: 0.9654
+      reference: 1.0753
+      champion better by: 0.1099
+      interval: 0.040 to 0.188
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Anchorage
+      rows: 182
+      target mean: 14.8797
+      champion: 2.2988
+      reference: 2.4209
+      champion better by: 0.1221
+      interval: -0.087 to 0.297
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Athens
+      rows: 182
+      target mean: 29.0253
+      champion: 2.0777
+      reference: 2.4599
+      champion better by: 0.3822
+      interval: 0.215 to 0.595
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Auckland
+      rows: 182
+      target mean: 16.2176
+      champion: 1.0807
+      reference: 1.2725
+      champion better by: 0.1918
+      interval: 0.081 to 0.315
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Bangkok
+      rows: 182
+      target mean: 33.6505
+      champion: 1.2185
+      reference: 1.4214
+      champion better by: 0.2029
+      interval: 0.093 to 0.305
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Beijing
+      rows: 182
+      target mean: 28.817
+      champion: 2.7588
+      reference: 3.1511
+      champion better by: 0.3923
+      interval: 0.060 to 0.623
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Berlin
+      rows: 182
+      target mean: 22.0753
+      champion: 3.2106
+      reference: 4.0214
+      champion better by: 0.8108
+      interval: 0.488 to 1.058
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Bogota
+      rows: 182
+      target mean: 20.1604
+      champion: 0.9543
+      reference: 1.1907
+      champion better by: 0.2364
+      interval: 0.155 to 0.329
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Buenos Aires
+      rows: 182
+      target mean: 16.3665
+      champion: 2.3949
+      reference: 2.9819
+      champion better by: 0.587
+      interval: 0.341 to 0.911
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Cairo
+      rows: 182
+      target mean: 35.2341
+      champion: 1.7135
+      reference: 2.0615
+      champion better by: 0.348
+      interval: 0.225 to 0.564
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Cape Town
+      rows: 182
+      target mean: 19.572
+      champion: 2.6407
+      reference: 3.2808
+      champion better by: 0.6401
+      interval: 0.331 to 0.893
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Casablanca
+      rows: 182
+      target mean: 26.572
+      champion: 2.378
+      reference: 2.3418
+      champion better by: -0.0363
+      interval: -0.326 to 0.216
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Chennai
+      rows: 182
+      target mean: 35.5456
+      champion: 1.3141
+      reference: 1.4231
+      champion better by: 0.109
+      interval: -0.023 to 0.227
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Chicago
+      rows: 182
+      target mean: 23.2462
+      champion: 3.3793
+      reference: 4.5104
+      champion better by: 1.1312
+      interval: 0.734 to 1.541
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Delhi
+      rows: 182
+      target mean: 35.222
+      champion: 2.1745
+      reference: 2.3071
+      champion better by: 0.1326
+      interval: -0.018 to 0.327
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Denver
+      rows: 182
+      target mean: 28.1143
+      champion: 3.7027
+      reference: 4.5923
+      champion better by: 0.8896
+      interval: 0.550 to 1.188
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Dubai
+      rows: 182
+      target mean: 37.5615
+      champion: 1.6457
+      reference: 1.9703
+      champion better by: 0.3246
+      interval: 0.165 to 0.468
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Houston
+      rows: 182
+      target mean: 31.5165
+      champion: 1.8143
+      reference: 2.217
+      champion better by: 0.4027
+      interval: 0.246 to 0.604
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Istanbul
+      rows: 182
+      target mean: 25.4033
+      champion: 2.458
+      reference: 2.8731
+      champion better by: 0.4151
+      interval: 0.227 to 0.676
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Jakarta
+      rows: 182
+      target mean: 33.6907
+      champion: 1.0631
+      reference: 1.1286
+      champion better by: 0.0655
+      interval: -0.037 to 0.164
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Johannesburg
+      rows: 182
+      target mean: 19.1231
+      champion: 2.0763
+      reference: 2.3956
+      champion better by: 0.3193
+      interval: 0.063 to 0.520
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Lagos
+      rows: 182
+      target mean: 29.1571
+      champion: 0.7059
+      reference: 0.9253
+      champion better by: 0.2194
+      interval: 0.140 to 0.297
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Lima
+      rows: 182
+      target mean: 23.3698
+      champion: 0.6888
+      reference: 0.7236
+      champion better by: 0.0348
+      interval: -0.032 to 0.089
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: London
+      rows: 182
+      target mean: 23.1044
+      champion: 2.7452
+      reference: 3.0582
+      champion better by: 0.3131
+      interval: -0.022 to 0.546
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Los Angeles
+      rows: 182
+      target mean: 29.1357
+      champion: 2.4499
+      reference: 2.5978
+      champion better by: 0.1479
+      interval: -0.078 to 0.373
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Madrid
+      rows: 182
+      target mean: 30.5005
+      champion: 2.6465
+      reference: 3.0951
+      champion better by: 0.4485
+      interval: 0.245 to 0.681
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Manaus
+      rows: 182
+      target mean: 31.5687
+      champion: 1.2449
+      reference: 1.3604
+      champion better by: 0.1156
+      interval: 0.005 to 0.267
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Mexico City
+      rows: 182
+      target mean: 25.0346
+      champion: 1.3967
+      reference: 1.6011
+      champion better by: 0.2044
+      interval: 0.051 to 0.346
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Miami
+      rows: 182
+      target mean: 30.85
+      champion: 1.1056
+      reference: 1.3198
+      champion better by: 0.2141
+      interval: 0.089 to 0.313
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Moscow
+      rows: 182
+      target mean: 19.7203
+      champion: 3.3172
+      reference: 3.7357
+      champion better by: 0.4185
+      interval: 0.092 to 0.718
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Mumbai
+      rows: 182
+      target mean: 31.267
+      champion: 0.9431
+      reference: 0.9308
+      champion better by: -0.0123
+      interval: -0.116 to 0.079
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Nairobi
+      rows: 182
+      target mean: 24.4176
+      champion: 1.247
+      reference: 1.4588
+      champion better by: 0.2118
+      interval: 0.117 to 0.306
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: New York
+      rows: 182
+      target mean: 25.6802
+      champion: 3.5408
+      reference: 4.2819
+      champion better by: 0.741
+      interval: 0.262 to 1.243
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Paris
+      rows: 182
+      target mean: 25.4588
+      champion: 3.2318
+      reference: 3.4148
+      champion better by: 0.183
+      interval: -0.172 to 0.448
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Phoenix
+      rows: 182
+      target mean: 37.7137
+      champion: 2.4351
+      reference: 2.8951
+      champion better by: 0.4599
+      interval: 0.281 to 0.668
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Reykjavik
+      rows: 182
+      target mean: 10.6549
+      champion: 1.4652
+      reference: 1.6626
+      champion better by: 0.1974
+      interval: 0.074 to 0.316
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Riyadh
+      rows: 182
+      target mean: 40.8714
+      champion: 1.5682
+      reference: 1.689
+      champion better by: 0.1208
+      interval: -0.024 to 0.284
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Rome
+      rows: 182
+      target mean: 30.6319
+      champion: 1.8408
+      reference: 1.8582
+      champion better by: 0.0174
+      interval: -0.205 to 0.196
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Santiago
+      rows: 182
+      target mean: 18.6665
+      champion: 2.8661
+      reference: 3.6445
+      champion better by: 0.7784
+      interval: 0.456 to 0.962
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Sao Paulo
+      rows: 182
+      target mean: 23.9725
+      champion: 2.7896
+      reference: 3.5808
+      champion better by: 0.7912
+      interval: 0.451 to 1.119
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Seattle
+      rows: 182
+      target mean: 20.9681
+      champion: 2.7141
+      reference: 3.3874
+      champion better by: 0.6733
+      interval: 0.481 to 0.949
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Seoul
+      rows: 182
+      target mean: 27.1736
+      champion: 2.5431
+      reference: 2.9181
+      champion better by: 0.375
+      interval: 0.143 to 0.593
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Shanghai
+      rows: 182
+      target mean: 28.9148
+      champion: 2.2414
+      reference: 2.7533
+      champion better by: 0.5119
+      interval: 0.306 to 0.792
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Singapore
+      rows: 182
+      target mean: 31.7615
+      champion: 0.8946
+      reference: 1.1346
+      champion better by: 0.24
+      interval: 0.129 to 0.341
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Stockholm
+      rows: 182
+      target mean: 18.1929
+      champion: 2.2611
+      reference: 2.7588
+      champion better by: 0.4977
+      interval: 0.285 to 0.697
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Sydney
+      rows: 182
+      target mean: 19.7462
+      champion: 1.8709
+      reference: 2.4346
+      champion better by: 0.5637
+      interval: 0.261 to 0.876
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Tehran
+      rows: 182
+      target mean: 32.8929
+      champion: 1.7379
+      reference: 2.0736
+      champion better by: 0.3357
+      interval: 0.161 to 0.520
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: city
+      value: Tokyo
+      rows: 182
+      target mean: 27.0412
+      champion: 2.7341
+      reference: 3.1819
+      champion better by: 0.4478
+      interval: 0.184 to 0.703
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Toronto
+      rows: 182
+      target mean: 21.4907
+      champion: 3.0691
+      reference: 3.6753
+      champion better by: 0.6062
+      interval: 0.174 to 0.953
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: city
+      value: Vancouver
+      rows: 182
+      target mean: 19.1967
+      champion: 2.3821
+      reference: 2.9242
+      champion better by: 0.5421
+      interval: 0.346 to 0.794
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: latitude (quantiles of training)
+      value: (-inf, 4.711]
+      rows: 2366
+      target mean: 22.9718
+      champion: 1.6778
+      reference: 2.0452
+      champion better by: 0.3673
+      interval: 0.318 to 0.421
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: latitude (quantiles of training)
+      value: (30.637, 41.008]
+      rows: 2366
+      target mean: 28.9988
+      champion: 2.5926
+      reference: 3.0165
+      champion better by: 0.4239
+      interval: 0.356 to 0.526
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: latitude (quantiles of training)
+      value: (4.711, 30.637]
+      rows: 2184
+      target mean: 32.3835
+      champion: 1.3805
+      reference: 1.5785
+      champion better by: 0.198
+      interval: 0.155 to 0.230
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: latitude (quantiles of training)
+      value: (41.008, inf]
+      rows: 2184
+      target mean: 20.8016
+      champion: 2.6596
+      reference: 3.119
+      champion better by: 0.4594
+      interval: 0.357 to 0.561
+      too small: false
+      worse than reference: false
+      far below overall: true
+    - slice: date by month
+      value: 2026-04
+      rows: 1400
+      target mean: 22.6321
+      champion: 2.3213
+      reference: 2.8712
+      champion better by: 0.5499
+      interval: 0.446 to 0.636
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-05
+      rows: 1550
+      target mean: 24.8259
+      champion: 2.4407
+      reference: 2.8196
+      champion better by: 0.3789
+      interval: 0.297 to 0.467
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-06
+      rows: 1500
+      target mean: 27.1275
+      champion: 2.0303
+      reference: 2.2779
+      champion better by: 0.2477
+      interval: 0.147 to 0.320
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-07
+      rows: 1550
+      target mean: 28.2003
+      champion: 1.9596
+      reference: 2.2585
+      champion better by: 0.2988
+      interval: 0.242 to 0.375
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-08
+      rows: 1550
+      target mean: 28.1972
+      champion: 1.7948
+      reference: 2.1279
+      champion better by: 0.3332
+      interval: 0.271 to 0.404
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-09
+      rows: 1500
+      target mean: 26.3893
+      champion: 1.9442
+      reference: 2.3307
+      champion better by: 0.3865
+      interval: 0.317 to 0.459
+      too small: false
+      worse than reference: false
+      far below overall: false
+    - slice: date by month
+      value: 2026-10
+      rows: 50
+      target mean: 25.248
+      champion: 2.2713
+      reference: 2.668
+      champion better by: 0.3967
+      interval: null
+      too small: true
+      worse than reference: false
+      far below overall: false
+    - slice: city seen in training
+      value: known
+      rows: 9100
+      target mean: 26.2768
+      champion: 2.0799
+      reference: 2.4434
+      champion better by: 0.3635
+      interval: 0.327 to 0.396
+      too small: false
+      worse than reference: false
+      far below overall: false
+  slice_settings:
+    categorical:
+      - city
+    numeric_bins:
+      latitude: 4
+    time:
+      column: date
+      period: M
+    new_entity: city
+    missing: []
+    protected: []
+    min_rows: 100
+    min_positives: 30
+  bootstrap:
+    n: 200
+    cluster: date
+    seed: 0
+  cluster: date
+  score_psi: 0.311458
+  target_psi: 0.256415
+  calibration: null
+  evidence:
+    - question: Does the champion beat naive on the test set?
+      answer: 'Yes: by +0.3635 (+14.9%), 95% interval +0.3228 to +0.4058; the interval is above zero.'
+    - question: Is the V1 bar met?
+      answer: 'met. On CV: met on cv (beats_best_baseline_cv pass). On test: met on test (beats_best_baseline_test
+        pass).'
+    - question: How does the test score compare with CV?
+      answer: Test 2.0799, CV 2.1630 (-0.0831). Close, so the CV estimate held.
+    - question: Is any other model better on the test set?
+      answer: 'No: the best other is ridge with 2.1460. The champion was fixed before the test set was opened; switching
+        now would make its test score optimistic.'
+    - question: Are there weak slices?
+      answer: '16: city = Beijing, city = Berlin, city = Cape Town, city = Chicago, city = Denver, city = London,
+        city = Madrid, city = Moscow, city = New York, city = Paris, city = Santiago, city = Sao Paulo, city = Seattle,
+        city = Tokyo, city = Toronto, latitude (quantiles of training) = (41.008, inf].'
+    - question: Has the data shifted?
+      answer: Prediction drift (PSI) 0.311, a large shift; drift of the actual values 0.256, a large shift. The
+        actual values moved as well, so the shift comes from the data; the bias metric shows whether the model kept
+        up.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T17:32:02 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T17:33:32 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
+    - question: Was the test set used before?
+      answer: The test set was opened on 2026-10-20T23:16:09 for champion lightgbm. The champion or the data changed
+        since, so if that change followed the earlier test results, this test score is optimistic.
+  v1:
+    cv:
+      'on': cv
+      status: met
+      criteria:
+        - id: beats_best_baseline_cv
+          kind: pct_over_reference
+          status: pass
+          detail: +14.0% against naive, needs 10%.
+    test:
+      'on': test
+      status: met
+      criteria:
+        - id: beats_best_baseline_test
+          kind: pct_over_reference
+          status: pass
+          detail: +14.9% against naive, needs 0%.
+    status: met
+  checks:
+    self_check:
+      - model: lightgbm
+        kind: champion
+        check: saved model against a fresh fit
+        recorded: null
+        recomputed: null
+        rel_diff: 0.0
+        ok: true
+      - model: ridge
+        kind: ml
+        check: CV mae reproduced
+        recorded: 2.230134
+        recomputed: 2.230134
+        rel_diff: 0.0
+        ok: true
+      - model: naive
+        kind: baseline
+        check: CV mae reproduced
+        recorded: 2.5156
+        recomputed: 2.515648
+        rel_diff: 1.9e-05
+        ok: true
+      - model: seasonal_naive
+        kind: baseline
+        check: CV mae reproduced
+        recorded: 3.327
+        recomputed: 3.327011
+        rel_diff: 3.0e-06
+        ok: true
+      - model: moving_average
+        kind: baseline
+        check: CV mae reproduced
+        recorded: 2.774
+        recomputed: 2.774013
+        rel_diff: 5.0e-06
+        ok: true
+  files:
+    test_predictions: data/processed/test_predictions.parquet
+    metrics: data/processed/evaluation_metrics.parquet
+    slices: data/processed/evaluation_slices.parquet
+    model_card: docs/model_card.md
+  test_opened:
+    - at: '2026-10-20T17:32:02'
+      champion: lightgbm
+      data_version: 03f76d78ab4a
+    - at: '2026-10-20T17:33:32'
+      champion: lightgbm
+      data_version: 03f76d78ab4a
+    - at: '2026-10-20T23:16:09'
+      champion: lightgbm
+      data_version: c5fbc6c59e95
+    - at: '2026-10-21T13:29:15'
+      champion: lightgbm
+      data_version: 16a68a33e055
+  decision: null
+  run_at: '2026-10-21T13:29:15'
+  mlflow:
+    run_id: e6c17520dc134794990e900753105847
+    experiment_id: '5'
+    url: http://127.0.0.1:5000/#/experiments/5/runs/e6c17520dc134794990e900753105847
+    logged_at: '2026-10-21T13:29:17'
+system:
+  status: confirmed
+  platform:
+    kind: platform
+    name: hopsworks
+  entry:
+    outcome: go
+    answer: null
+    reason: null
+    evaluation_decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never
+      significantly worse than persistence in any city.'
+  champion: lightgbm
+  components:
+    ingestion:
+      needed: true
+      tool: Hopsworks job (Python) writing to the feature group weather_daily
+      settings:
+        frequency: hourly
+        source: Open-Meteo archive API, all 50 cities in one batched request per run
+        limits: Open-Meteo free tier (non commercial; per minute, hourly, and daily request caps), one request per
+          run
+        fetch: the newest day only
+        feature_group: weather_daily (primary key city, event time date)
+      reason: The 50 cities close their local day at different UTC hours, so an hourly run keeps each city's last
+        complete day available soon after it ends, for requests that arrive at any time.
+    data_validation:
+      needed: true
+      tool: Great Expectations suite attached to weather_daily (strict ingestion policy)
+      settings:
+        checks:
+          - the 23 columns and their types
+          - value ranges (temperatures -90 to 60 C; precipitation
+          - snowfall
+          - wind
+          - radiation at least 0; wind direction 0 to 360; sunshine 0 to 86400 s; valid WMO weather_code)
+          - min <= mean <= max temperature
+          - one row per city and date
+          - only the 50 known cities
+        freshness: checked separately per city against its last complete local day; a late day triggers the fallback,
+          not a rejection
+        on_failure: reject the batch and alert
+      reason: A bad upstream day must never become features, while a late day is handled by the fallback.
+    features:
+      needed: true
+      tool: Hopsworks feature group weather_features and a feature view (offline and online store)
+      settings:
+        served_inputs:
+          - latitude
+          - longitude
+          - elevation
+          - temp_max_change_1d
+          - temp_max_vs_28d_mean
+          - date_dayofyear
+          - date_month
+          - log_elevation
+          - temperature_2m_max_lag_2d
+          - temperature_2m_max_lag_3d
+          - temperature_2m_max_lag_7d
+          - temperature_2m_max_lag_364d
+          - temperature_2m_min_lag_2d
+          - temperature_2m_mean_lag_2d
+          - apparent_temperature_max_lag_2d
+          - apparent_temperature_min_lag_2d
+          - precipitation_sum_lag_2d
+          - snowfall_sum_lag_2d
+          - wind_speed_10m_max_lag_2d
+          - wind_gusts_10m_max_lag_2d
+          - wind_direction_10m_dominant_lag_2d
+          - shortwave_radiation_sum_lag_2d
+          - sunshine_duration_lag_2d
+          - weather_code_lag_2d
+          - temperature_2m_max_roll_7d_mean_shift_2d
+          - temperature_2m_max_roll_28d_mean_shift_2d
+          - city
+        code: src/features.build_features, the same function used in training (features hash 32c8d1bec95ed0b7)
+        rows: one per city and target date; the row for target date T uses data up to T minus 2 days
+        offline_store: point in time training data from the feature view
+        online_store: the latest row per city; every lag and rolling mean is precomputed, so a request only looks
+          up the city
+        encoding: the ordinal encoding of city stays inside the model pipeline
+        backfill: run the feature pipeline once over 2024-01-01 to today, and again when a definition changes
+      reason: One build_features for training and serving means the features cannot drift apart, and precomputed
+        rows keep request time work to a lookup.
+    training:
+      needed: true
+      tool: Hopsworks job creating training data from the feature view
+      settings:
+        trigger: on drift (from monitoring) or by hand
+        window: expanding, from 2024-01-01 to the last labelled day minus the 28 day holdout
+        refit: LightGBM with the champion's tuned settings, no retuning (retuning and new features stay in /ml-iterate)
+        output: a candidate model in the Hopsworks registry; it becomes the challenger only if it passes the offline
+          holdout test
+      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; a refit is started
+        when monitoring flags drift or by hand.
+    registry:
+      needed: true
+      tool: Hopsworks model registry
+      settings:
+        decides_champion: Hopsworks registry decides the champion and challenger once deployed; MLflow keeps the
+          local experiments, linked by the MLflow run id
+        gate:
+          metric: MAE
+          test:
+            name: diebold_mariano
+            alpha: 0.05
+            sided: one
+          window_days: null
+          promotion: manual
+        entry: a candidate becomes the challenger when it beats the champion on the most recent 28 labelled days,
+          after both models' training cutoffs, with the same one sided Diebold-Mariano test at alpha 0.05
+        live: the challenger predicts in shadow next to the champion; both are scored on the same city-days, and
+          the owner promotes by hand once the test is significant
+        after_promotion: the previous champion stays in shadow for 28 days, then is retired
+        lineage: model version, MLflow run id, feature view version, features hash, training dataset version
+      reason: A paired significance test on the daily MAE gap judges two models on the same days, so the seasonal
+        difficulty that inflates the CV spread cancels out; no fixed margin is needed.
+    inference:
+      needed: true
+      tool: Hopsworks KServe predictor reading the online feature view
+      settings:
+        mode: online
+        schedule: on_request
+        steps: look up the city's latest feature row, check it is for tomorrow's target date (else the fallback),
+          predict with the champion and every shadow model
+        logging: one row per model per request in the feature group predictions (request id and time, city, target
+          date, model name and version, prediction, served or shadow, fallback used, feature row version, the persistence
+          forecast)
+        dedup: one prediction per city, target date, and model for the gate and monitoring, since repeat requests
+          on a day use the same features
+      reason: Online inference is the learning goal and the framing's cadence; logging every model's prediction
+        is what the gate and monitoring read.
+    serving:
+      needed: true
+      tool: Hopsworks model deployment (KServe) with a predictor script
+      settings:
+        environments:
+          - prod
+        secrets: the Hopsworks API key in the environment, never in code
+        contract: request {city}; response {city, target_date, forecast_max_c, model_version, fallback_used, inputs_as_of};
+          a city outside the 50 returns an error
+        rollback: switch the deployment to the previous model version, one step
+      reason: One environment is enough for a portfolio project; the component tests run against a separate Hopsworks
+        test project instead of a dev environment.
+    label_feedback:
+      needed: true
+      tool: Daily Hopsworks job joining actuals into the feature group scored_predictions
+      settings:
+        label_arrives: the day after the target date (1 day label delay)
+        join: city and target date
+        output: city, target date, model version, served or shadow, prediction, actual, absolute error
+      reason: The gate's test and monitoring read only this table, so the join is done once.
+    monitoring:
+      needed: true
+      tool: Hopsworks feature monitoring plus Evidently, as a daily job after label feedback
+      settings:
+        data_drift: PSI of each input against the same calendar month in training; alert above 0.25
+        prediction_drift: PSI of the predictions against the same calendar month in training; alert above 0.25
+        performance: the served model's rolling 28 day live MAE against persistence on the same city-days; alert
+          when the reverse one sided Diebold-Mariano test says the model is not better; shown next to the evaluation's
+          monthly MAE (1.79 to 2.44 C)
+        system_health: failed jobs, predictor errors and latency, the daily share of requests served by the fallback
+          (alert under 95% model served)
+        alerts: email to the owner
+      reason: The evaluation's PSI (0.31 on predictions, 0.26 on actuals) came from the seasons, so drift is compared
+        month for month.
+    failure_handling:
+      needed: true
+      tool: Fallback in the predictor script
+      settings:
+        fallback: persistence from the newest complete day when inputs are stale by up to 3 days or the model fails;
+          the seasonal naive (the same date last year) when inputs are more than 3 days old
+        flags: fallback_used and inputs_as_of in every response
+        target: every request for one of the 50 cities gets a forecast; at least 95% of a day's requests are served
+          by the model
+      reason: Persistence is the baseline the model must beat (the user's answer to Q1); it degrades with age, so
+        the seasonal value takes over after 3 days.
+    orchestration:
+      needed: true
+      tool: Hopsworks jobs with schedules
+      settings:
+        order:
+          - hourly ingestion and validation
+          - then the feature pipeline; daily label feedback
+          - then monitoring; training on drift or by hand
+          - then the offline holdout test
+        retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
+          serving with the fallback
+      reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed.
+    testing:
+      needed: true
+      tool: pytest (tests/unit, tests/component, tests/system)
+      settings:
+        unit: build_features on a small fixed history (lags never shorter than 2 days, rolling means end on the
+          last complete day), the fallback rules, src/compare.py's Diebold-Mariano and block bootstrap against known
+          cases
+        component: the validation suite rejects bad batches; the feature pipeline writes the same values offline
+          and online for one city (training and serving skew); the predictor falls back on a stale row; run against
+          a separate Hopsworks test project
+        system: raw rows for one city through ingestion, features, the deployed predictor, and label feedback, ending
+          in a scored prediction
+      reason: The skew between offline and online features is the costliest silent bug, and with prod only the component
+        tests stand in for a dev environment.
+  champion_dependent:
+    - features
+    - registry
+    - monitoring
+    - failure_handling
+  warnings_accepted: []
+  risks:
+    - problem: Open-Meteo's archive serves recent days from one model and may replace them with ERA5 reanalysis
+        about 5 days later; with the newest day fetched once and no revision check, a changed value would go unseen.
+      resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
+    - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
+        may take months to reach significance.
+      resolution: If the gate stalls, add a daily scheduled request for all 50 cities.
+    - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
+        raises the real false promotion rate above alpha.
+      resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
+        borderline.
+    - problem: With prod only, every deployment change is first exercised live.
+      resolution: Component tests run against a separate Hopsworks test project.
+  doc: docs/system_design.md
+  run_at: '2026-10-21T12:54:01'
+  doc_hash: a0fed2ee8177d9c2
+iterations:
+  current: null
+  entries:
+    - id: 1
+      opened_at: '2026-10-20T21:42:03'
+      hypothesis: Target-encoding city and country gives both models a meaningful number for each place's typical
+        temperature level in place of 50 one-hot columns (ridge) or arbitrary integer codes (LightGBM), and pools
+        the cities within a country, which should lower CV MAE against the V1 LightGBM carried forward on the same
+        folds.
+      diagnosis:
+        - The V1 LightGBM champion beats persistence by 14.9% on test (2.080 against 2.443), and ridge is close
+          behind (2.146).
+        - City is ordinal-encoded for LightGBM (arbitrary codes) and one-hot for ridge (50 columns); it is not among
+          the top 10 features.
+        - Country is excluded as redundant with city, though 6 of 36 countries have more than one city (United States
+          9).
+        - Weak slices are high latitude cities; drift between training and test comes from the seasons, and test
+          bias is near zero.
+      changes:
+        - stage: features
+          change: Move city from categorical to high_cardinality and bring country back from the excluded list as
+            high_cardinality, so both the linear (ridge) and tree (LightGBM) preprocessors target-encode city and
+            country with sklearn's TargetEncoder, fitted inside each CV fold.
+        - stage: training
+          change: Retrain ridge and LightGBM with the same tuning budget (20 trials each), plus the V1 LightGBM
+            carried forward with its tuned settings fixed.
+      rerun:
+        - features
+        - baseline
+        - training
+        - evaluation
+      start:
+        champion: lightgbm
+        type: lightgbm
+        cv: 2.163048
+        cv_std: 0.23589
+        test: 2.079935
+        test_look: 2
+        data_version: 03f76d78ab4a
+        metric: mae
+      snapshot: iterations/iter_0
+      status: closed
+      start_hashes:
+        features_config: 5cf6a9dcce2a
+        custom_features: df0eb8ea531a
+        split_cv: ef812cfee9a0
+      version: V2
+      previous_version: V1
+      mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+      carried_forward:
+        name: lightgbm_iter0
+        type: lightgbm
+        params:
+          colsample_bytree: 0.881961
+          learning_rate: 0.012874
+          min_child_samples: 88
+          n_estimators: 700
+          num_leaves: 40
+          reg_lambda: 0.004712
+          subsample: 0.533786
+          subsample_freq: 1
+        inputs:
+          - apparent_temperature_max_lag_2d
+          - apparent_temperature_min_lag_2d
+          - city
+          - date_dayofyear
+          - date_month
+          - elevation
+          - latitude
+          - log_elevation
+          - longitude
+          - precipitation_sum_lag_2d
+          - shortwave_radiation_sum_lag_2d
+          - snowfall_sum_lag_2d
+          - sunshine_duration_lag_2d
+          - temp_max_change_1d
+          - temp_max_vs_28d_mean
+          - temperature_2m_max_lag_2d
+          - temperature_2m_max_lag_364d
+          - temperature_2m_max_lag_3d
+          - temperature_2m_max_lag_7d
+          - temperature_2m_max_roll_28d_mean_shift_2d
+          - temperature_2m_max_roll_7d_mean_shift_2d
+          - temperature_2m_mean_lag_2d
+          - temperature_2m_min_lag_2d
+          - weather_code_lag_2d
+          - wind_direction_10m_dominant_lag_2d
+          - wind_gusts_10m_max_lag_2d
+          - wind_speed_10m_max_lag_2d
+        usable: true
+        missing: []
+      closed_at: '2026-10-20T22:06:00'
+      outcome: rolled_back
+      reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+        2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+        2.2301). The iteration bar failed, so V1 stays.'
+      end:
+        champion: lightgbm_iter0
+        type: lightgbm
+        cv: 2.163734
+        cv_std: 0.233525
+        test: null
+        test_look: 2
+        data_version: b77122beb607
+        metric: mae
+        folds: ef812cfee9a0
+        carried_forward_cv: 2.163734
+      not_rerun:
+        - evaluation
+      bar_result:
+        status: fail
+        wins: 0
+        folds: null
+        mean_diff: null
+        spread: null
+        detail: The carried champion lightgbm_iter0 is still the best model, so no new model beat it.
+  bar:
+    min_fold_win_share: 0.5
+    spread_multiple: 1.0
+    min_folds: 3
+    max_iterations: 3
+autopilot: {}
+assumptions:
+  - The forecast is for the next calendar day only (one day after the request, two days after the last complete
+    day), for the daily maximum temperature at 2 m.
+  - The archive API returns the last complete day promptly in production (recent days come from the ECMWF IFS model
+    with no delay; ERA5 runs about 5 days behind).
+  - Persistence from the last complete day is the naive forecast with a 2 day lag.
+  - The weather of April to September 2026 is like the weather the system will forecast next.
+  - The archive's values for past days do not change after they are first published.
+  - The forecast is for the next calendar day only (one day after the request, two days after the last complete
+    day), for the daily maximum temperature at 2 m.
+  - The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
+open_questions:
+  - id: Q1
+    question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
+    stage: system
+    raised_by: ml-business-framing
+    status: resolved
+    answer: Serve persistence from the newest complete day when inputs are stale by up to 3 days or the model fails,
+      then the seasonal naive (same date last year); every response flags fallback_used and inputs_as_of. Recorded
+      in docs/system_design.md (failure handling).
+  - id: Q2
+    question: How long should the test period be? 90 days covers only one season; a longer period covers more weather
+      but leaves less history for CV.
+    stage: split
+    raised_by: ml-problem-framing
+    status: resolved
+    answer: The test period is 182 days (2026-04-03 to 2026-10-01); CV covers the year before it in four 91 day
+      folds.
+  - id: Q3
+    question: 'Is `temperature_2m_mean` known at prediction time? EDA flagged it as possible leakage: association
+      with the target is 0.976.'
+    stage: features
+    raised_by: ml-eda-report
+    status: resolved
+    answer: temperature_2m_mean is known only 2 or more days later; it is used only as a 2 day lag.
+  - id: Q4
+    question: 'Is `apparent_temperature_max` known at prediction time? EDA flagged it as possible leakage: association
+      with the target is 0.980.'
+    stage: features
+    raised_by: ml-eda-report
+    status: resolved
+    answer: apparent_temperature_max is known only 2 or more days later; it is used only as a 2 day lag.
+  - id: Q5
+    question: Which Hopsworks project and cluster will host the system, and which separate project runs the component
+      tests?
+    stage: system
+    raised_by: ml-system-design
+    status: open
+decisions:
+  - date: '2026-10-20'
+    stage: business
+    decision: Predict the daily maximum temperature one day ahead, not minimum or mean, and not 1 to 7 days.
+    reason: The user chose it to keep V1 focused on building the system end to end.
+  - date: '2026-10-20'
+    stage: business
+    decision: Forecasts are made on request, from inputs up to the last complete day; persistence uses that day's
+      maximum.
+    reason: Requests can arrive at any time, when the current day is not complete.
+  - date: '2026-10-20'
+    stage: framing
+    decision: Forecasting layout with target temperature_2m_max and a horizon of 2 days.
+    reason: Requests arrive when the current day is incomplete, so inputs stop at the last complete day.
+  - date: '2026-10-20'
+    stage: framing
+    decision: MAE is the primary metric; the V1 bar is 10% under the best simple baseline on CV and still under
+      it on test.
+    reason: The user chose it; it matches the 10% in the answer actions.
+  - date: '2026-10-20'
+    stage: split
+    decision: Time split with a 182 day test period (2026-04-03 to 2026-10-01), no gap, and four expanding 91 day
+      CV folds.
+    reason: The model forecasts the future; the 2 day horizon is enforced by the feature lags, and longer windows
+      give stable scores.
+  - date: '2026-10-20'
+    stage: features
+    decision: Same day weather columns are used only as lags of 2 days; redundant location columns are left out.
+    reason: The user confirmed (Q3, Q4) that they are known only from the last complete day.
+  - date: '2026-10-20'
+    stage: features
+    decision: Custom features temp_max_change_1d and temp_max_vs_28d_mean.
+    reason: The user asked for them as domain features.
+  - date: '2026-10-20'
+    stage: features
+    decision: 'Confirmed as safe: the target lags 2 and 3, the 7 and 28 day rolling means, and the 2 day lags of
+      temperature_2m_mean and apparent_temperature_max, despite associations above 0.9.'
+    reason: Each ends at least 2 days before the target date (min_shift_days = 2, enforced by the feature code);
+      temperature is persistent, so a high association is expected. Lag 2 is the persistence forecast itself.
+  - date: '2026-10-20'
+    stage: baseline
+    decision: Baselines are persistence (lag 2), seasonal naive (lag 364), and a 28 day moving average; the reference
+      is the best of them.
+    reason: The project is exploratory, with no current approach; the user chose these three.
+  - date: '2026-10-20'
+    stage: training
+    decision: Build ridge and LightGBM with quick tuning (20 trials each).
+    reason: The user chose them; a simple and a complex model, compared on the same folds.
+  - date: '2026-10-20'
+    stage: evaluation
+    decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it.'
+    reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
+      on CV and test, beats persistence in every city, month, and latitude band, and shows no accuracy decay over
+      26 weeks. This matches the answer action for beating persistence by 10% or more.
+    superseded_by: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never significantly
+      worse than persistence in any city.'
+    superseded_on: '2026-10-20'
+  - date: '2026-10-20'
+    stage: iteration
+    decision: 'Closed iteration 1 (V2): rolled back.'
+    reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+      2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+      2.2301). The iteration bar failed, so V1 stays.'
+  - date: '2026-10-20'
+    stage: evaluation
+    decision: 'Go: promote lightgbm as the V1 champion and build the serving stack around it; it is never significantly
+      worse than persistence in any city.'
+    reason: It beats persistence on the test set by 0.36 degrees (14.9%, interval 0.32 to 0.41), meets the V1 bar
+      on CV and test, beats persistence in every month and latitude band, and is never significantly worse in any
+      city (Casablanca and Mumbai are ties, with intervals that include zero), and shows no accuracy decay over
+      26 weeks. This matches the answer action for beating persistence by 10% or more.
+  - date: '2026-10-21'
+    stage: system
+    decision: Use Hopsworks for the deployed system, including the registry, champion, and challenger; MLflow keeps
+      local experiments.
+    reason: The user chose it at the start of the design.
+  - date: '2026-10-21'
+    stage: system
+    decision: The promotion gate is a paired one sided Diebold-Mariano test on daily MAE at alpha 0.05, with a recent
+      28 day holdout for the challenger entry, manual promotion, and the previous champion in shadow for 28 days.
+    reason: The user chose statistical significance over a fixed margin; the CV std margin reflected seasonal difficulty,
+      not the noise of a paired comparison.
+  - date: '2026-10-21'
+    stage: system
+    decision: When inputs are stale, serve persistence for up to 3 days, then the seasonal naive.
+    reason: The user's answer to Q1 (serve the baseline), refined so every request gets a forecast.
+history:
+  - at: '2026-10-20T12:00:53'
+    skill: ml-project-setup
+    action: created spec
+  - at: '2026-10-20T12:00:53'
+    skill: ml-project-setup
+    action: merge root from tmp61w6fk5p.json
+  - at: '2026-10-20T12:01:03'
+    skill: ml-project-setup
+    action: 'tracking: experiment ml/16-weather-prediction on http://127.0.0.1:5000'
+  - at: '2026-10-20T12:22:48'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T12:22:48'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T13:38:51'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T13:38:51'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T13:39:35'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T13:39:35'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T13:48:36'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T13:48:36'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T13:54:52'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T13:55:19'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T13:55:19'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T13:55:19'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T13:58:52'
+    skill: ml-eda-report
+    action: wrote eda for data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-20T14:08:48'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T14:25:31'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T14:26:27'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T14:26:28'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T14:26:28'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T14:31:05'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-20T14:31:05'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
+  - at: '2026-10-20T17:11:51'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:11:51'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T17:14:38'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:14:38'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T17:15:38'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T17:15:38'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T17:32:02'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-20T17:32:03'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T17:33:32'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-20T17:33:32'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T22:06:01'
+    skill: ml-iterate
+    action: closed iteration 1 (rolled_back)
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T22:06:15'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T23:04:23'
+    skill: ml-business-framing
+    action: wrote business from its notebook
+  - at: '2026-10-20T23:04:23'
+    skill: ml-business-framing
+    action: ran 01_business_framing.ipynb
+  - at: '2026-10-20T23:04:27'
+    skill: ml-data-discovery
+    action: wrote discovery from its notebook
+  - at: '2026-10-20T23:04:27'
+    skill: ml-data-discovery
+    action: ran 02_data_discovery.ipynb
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: wrote framing from its notebook
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: wrote data from its notebook
+  - at: '2026-10-20T23:04:29'
+    skill: ml-problem-framing
+    action: ran 03_problem_framing.ipynb
+  - at: '2026-10-20T23:04:38'
+    skill: ml-eda-report
+    action: wrote eda for data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-20T23:04:40'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-20T23:04:46'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-20T23:04:49'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-20T23:04:50'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
+  - at: '2026-10-20T23:15:44'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-20T23:15:44'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-20T23:16:09'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-20T23:16:09'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-20T23:16:11'
+    skill: ml-reconcile-notes
+    action: reconciled 6 notes
+  - at: '2026-10-21T12:50:49'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-21T12:50:50'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-21T12:54:01'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-21T12:54:01'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-21T12:54:19'
+    skill: ml-reconcile-notes
+    action: reconciled 1 notes
+  - at: '2026-10-21T13:16:29'
+    skill: ml-train-test-split
+    action: wrote split from its notebook
+  - at: '2026-10-21T13:16:29'
+    skill: ml-train-test-split
+    action: resolved Q2
+  - at: '2026-10-21T13:16:30'
+    skill: ml-train-test-split
+    action: ran 05_split.ipynb
+  - at: '2026-10-21T13:16:37'
+    skill: ml-feature-engineering
+    action: wrote features from its notebook
+  - at: '2026-10-21T13:16:38'
+    skill: ml-feature-engineering
+    action: resolved Q3, Q4
+  - at: '2026-10-21T13:16:38'
+    skill: ml-feature-engineering
+    action: ran 06_features.ipynb
+  - at: '2026-10-21T13:16:44'
+    skill: ml-baseline-model
+    action: wrote baseline from its notebook
+  - at: '2026-10-21T13:16:44'
+    skill: ml-baseline-model
+    action: ran 07_baseline.ipynb
+  - at: '2026-10-21T13:28:43'
+    skill: ml-model-training
+    action: wrote training from its notebook
+  - at: '2026-10-21T13:28:44'
+    skill: ml-model-training
+    action: ran 08_training.ipynb
+  - at: '2026-10-21T13:29:15'
+    skill: ml-offline-evaluation
+    action: wrote evaluation from its notebook
+  - at: '2026-10-21T13:29:15'
+    skill: ml-offline-evaluation
+    action: ran 09_evaluation.ipynb
+  - at: '2026-10-21T13:43:34'
+    skill: ml-project-setup
+    action: fill root from tmpjs_w9lat.json
+version:
+  current: V1
+  branch: ml/v1
+  history:
+    - version: V1
+      branch: ml/v1
+      status: kept
+      champion: lightgbm
+      cv: 2.163048
+      test: 2.079935
+      git_tag: v1
+    - version: V2
+      branch: ml/v2
+      status: rolled_back
+      closed_at: '2026-10-20T22:06:02'
+      reason: 'Target encoding city and country did not help: on the same folds LightGBM with the V1 settings scored
+        2.1637 against 2.1630 with ordinal city, the retuned LightGBM 2.1648, and ridge got worse (2.2440 against
+        2.2301). The iteration bar failed, so V1 stays.'
+      champion: lightgbm_iter0
+      cv: 2.163734
+      test: null
+      mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+      git_tag: v2-rolled-back
+  previous: V1
+  mlflow_parent_run: a29d5b4232d94c2284f2ca4f5ffdd7a7
+git:
+  auto_commit: true
+tracking:
+  uri: http://127.0.0.1:5000
+  experiment: ml/16-weather-prediction
+  experiment_id: '5'
+  ui: http://127.0.0.1:5000/#/experiments/5
+  registered_model: 16-weather-prediction-champion

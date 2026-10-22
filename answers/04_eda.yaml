@@ -1,0 +1,11 @@
+# Settings the eda notebook was last built from, written by ml-eda-report. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-eda-report
+stage: eda
+saved_at: '2026-10-20T13:58:52'
+command:
+  - run_eda.py
+  - data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - --name
+  - weather
+answers: null

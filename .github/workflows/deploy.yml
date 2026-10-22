@@ -1,0 +1,40 @@
+# Deploy main to the Hopsworks project, then check it works. To roll back, revert on main, or run this workflow
+# by hand from the Actions tab with the commit to go back to.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The commit on main to deploy (default the newest)
+        required: false
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+      REF: ${{ inputs.ref || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - name: Deploy
+        run: uv run --frozen python -m deploy.apply --ref "$(git rev-parse HEAD)"
+      - name: Smoke check
+        run: uv run --frozen python -m deploy.smoke

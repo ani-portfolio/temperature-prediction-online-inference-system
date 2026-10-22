@@ -1,0 +1,167 @@
+# Settings the discovery notebook was last built from, written by ml-data-discovery. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-data-discovery
+stage: discovery
+saved_at: '2026-10-20T13:39:35'
+command:
+  - discover.py
+  - data/raw/open_meteo_daily_2024-01-01_2026-10-01.csv
+  - --names
+  - weather
+  - --main
+  - weather
+  - --answers
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/discovery_answers.yaml
+answers:
+  dictionary_answers:
+    weather.city:
+      meaning: City name, chosen in the downloader's city list. Together with date it identifies a row.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.country:
+      meaning: Country of the city.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.latitude:
+      meaning: Latitude of the city as requested, in decimal degrees (WGS84).
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.longitude:
+      meaning: Longitude of the city as requested, in decimal degrees (WGS84).
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.grid_latitude:
+      meaning: Latitude of the centre of the model grid cell the API used, which can be a few km from the requested
+        point.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.grid_longitude:
+      meaning: Longitude of the centre of the model grid cell the API used.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.elevation:
+      meaning: Elevation of the location used by the API, in metres above sea level.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.timezone:
+      meaning: IANA timezone the API assigned from the coordinates (timezone=auto). Daily values follow this local
+        calendar day.
+      timing: static
+      source: reviewed
+      notes: 'Fixed per city. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.date:
+      meaning: Local calendar date of the row (in the city's timezone).
+      timing: event_time
+      source: reviewed
+      notes: 'One row per city per date. Source: Open-Meteo Historical Weather API docs and src/download_weather.py.'
+    weather.temperature_2m_max:
+      meaning: 'Maximum air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.temperature_2m_min:
+      meaning: 'Minimum air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.temperature_2m_mean:
+      meaning: 'Mean air temperature at 2 m above ground during the day. Unit: degrees Celsius.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.apparent_temperature_max:
+      meaning: 'Maximum apparent (feels like) temperature during the day, combining temperature, wind, humidity
+        and radiation. Unit: degrees Celsius.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.apparent_temperature_min:
+      meaning: 'Minimum apparent (feels like) temperature during the day. Unit: degrees Celsius.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.precipitation_sum:
+      meaning: 'Total precipitation during the day (rain, showers, and snowfall as water). Unit: mm.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.rain_sum:
+      meaning: 'Total rain during the day. Unit: mm.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.snowfall_sum:
+      meaning: 'Total snowfall during the day. Unit: cm.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.wind_speed_10m_max:
+      meaning: 'Maximum wind speed at 10 m above ground during the day. Unit: km/h.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.wind_gusts_10m_max:
+      meaning: 'Maximum wind gust at 10 m above ground during the day. Unit: km/h.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.wind_direction_10m_dominant:
+      meaning: 'Dominant wind direction at 10 m above ground during the day. Unit: degrees (0 to 360, from north).'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.shortwave_radiation_sum:
+      meaning: 'Total shortwave solar radiation during the day. Unit: MJ per square metre.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.sunshine_duration:
+      meaning: 'Duration of sunshine during the day. Unit: seconds.'
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+    weather.weather_code:
+      meaning: Most severe weather condition of the day, as a WMO weather code (for example 0 clear, 61 rain, 71
+        snow).
+      timing: at_event
+      source: reviewed
+      notes: 'Describes the row''s local calendar date (timezone=auto) and is known at the end of that day. A next
+        day target is built by shifting the date, so the value itself is not after the outcome. Source: Open-Meteo
+        Historical Weather API docs and src/download_weather.py.'
+  source_descriptions:
+    weather: Daily weather for 50 cities from the Open-Meteo Historical Weather API (archive), 2024-01-01 to 2026-10-01,
+      one row per city and local date. Modelled data (ECMWF IFS and ERA5 reanalysis), not station observations.
+      Downloaded by src/download_weather.py; the request URLs are in the .meta.json beside the file.

@@ -1,0 +1,19 @@
+{
+  "env": {
+    "MLFLOW_CLAUDE_TRACING_ENABLED": "true",
+    "MLFLOW_TRACKING_URI": "http://127.0.0.1:5000",
+    "MLFLOW_EXPERIMENT_ID": "5"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"/Users/ani/Projects/claude-skills/tools/session_env.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

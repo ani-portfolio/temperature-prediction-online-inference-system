@@ -1,0 +1,29 @@
+# Environment
+.venv/
+.venv.old-*/
+__pycache__/
+*.pyc
+.env
+*.tmp
+*.egg-info/
+
+# Data and models (the folders are kept, their contents are not committed)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+models/*
+!models/.gitkeep
+
+# Notebooks and tools
+.ipynb_checkpoints/
+.ruff_cache/
+.pytest_cache/
+.DS_Store
+
+# Copies the skills keep outside git (git history already holds every version)
+iterations/
+.iterate_backup/
+.reconcile_backup/
+mlflow_export/
+.claude/settings.local.json

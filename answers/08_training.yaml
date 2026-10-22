@@ -1,0 +1,43 @@
+# Settings the training notebook was last built from, written by ml-model-training. Rebuild with the same
+# script and this file. The notebook's decision cells are the record; the next build replaces this.
+skill: ml-model-training
+stage: training
+saved_at: '2026-10-20T17:11:54'
+command:
+  - make_notebook.py
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/3a337ff4-003b-46d2-869c-9d81649c3a84/scratchpad/training.yaml
+answers:
+  models:
+    - name: ridge
+      type: ridge
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: 'The simple model first: it shows whether the lag, calendar, and location features beat persistence
+        without any complexity, and it is easy to explain.'
+    - name: lightgbm
+      type: lightgbm
+      params: {}
+      class_weight: null
+      tuning:
+        n_trials: 20
+        timeout_minutes: 10
+      reason: Gradient boosting can learn interactions such as latitude with day of year, where seasons flip between
+        hemispheres.
+  training:
+    seed: 42
+    selection: best_mean
+  reasoning:
+    models: A linear model and gradient boosting show how much a complex model adds over a simple one, both against
+      persistence (CV MAE 2.52), which the V1 bar requires beating by 10% (MAE 2.26 or lower).
+    tuning: Quick tuning (20 trials) for both. Ridge has one main setting; for LightGBM the tuning curve shows whether
+      a thorough search would help.
+  risks: []
+  assumptions: []
+  open_questions: []
+  decisions:
+    - decision: Build ridge and LightGBM with quick tuning (20 trials each).
+      reason: The user chose them; a simple and a complex model, compared on the same folds.
+  resolved_questions: []
