@@ -50,10 +50,11 @@ def _feature_types(rows: pd.DataFrame, config: dict) -> pd.DataFrame:
 
 
 def _write(fs, daily: pd.DataFrame, rows: pd.DataFrame, config: dict, report: FeatureRunReport):
-    fg_daily = store.daily_group(fs)
-    store.ensure_suite(fg_daily)
-    fg_daily.insert(_daily_types(daily), wait=True)
-    report.days_written += len(daily)
+    if len(daily):   # a run that only repairs feature rows has no new days
+        fg_daily = store.daily_group(fs)
+        store.ensure_suite(fg_daily)
+        fg_daily.insert(_daily_types(daily), wait=True)
+        report.days_written += len(daily)
     fg_rows = store.features_group(fs, ((_spec().get("features") or {}).get("code") or {}).get("features_hash"))
     fg_rows.insert(_feature_types(rows, config), wait=True)
     report.feature_rows_written += len(rows)
@@ -87,9 +88,46 @@ def backfill(start: date, end: date | None = None, raw_csv: Path | None = None, 
     return report
 
 
+@dataclass
+class CityWork:
+    """What one hourly run does for one city: fetch days fetch_from..fetch_to (None: nothing to fetch), then
+    rebuild its feature rows for target dates rebuild_from..rebuild_to (rebuild_from None: from its first day)."""
+    city: str
+    fetch_from: date | None
+    fetch_to: date | None
+    rebuild_from: date | None
+    rebuild_to: date
+
+
+def plan_work(daily_newest: dict[str, date], features_newest: dict[str, date], zones: dict[str, str],
+              now: datetime, horizon: int) -> list[CityWork]:
+    """The work for each city, from the newest day in weather_daily and the newest target date in weather_features.
+
+    Days are fetched when weather_daily is behind the city's last complete local day. Feature rows are rebuilt
+    when weather_features is behind the stored days plus the horizon, also when nothing is fetched: a run that
+    wrote the days but stopped before the features is then repaired by the next run. The rebuild starts at the
+    first target date whose label or inputs may come from a day written after the features last were.
+    """
+    work = []
+    for city in sorted(daily_newest):
+        have, end = daily_newest[city], last_complete_day(zones[city], now)
+        fetching = have < end
+        fetch_from, fetch_to = (have + timedelta(days=1), end) if fetching else (None, None)
+        rebuild_to = max(have, end) + timedelta(days=horizon)
+        built = features_newest.get(city)
+        if built is None:
+            work.append(CityWork(city, fetch_from, fetch_to, None, rebuild_to))
+        elif fetching or built < rebuild_to:
+            rebuild_from = built - timedelta(days=horizon - 1)
+            if fetching:
+                rebuild_from = min(rebuild_from, fetch_from)
+            work.append(CityWork(city, fetch_from, fetch_to, rebuild_from, rebuild_to))
+    return work
+
+
 def run_latest(now: datetime | None = None, config: dict | None = None) -> FeatureRunReport:
     """The hourly job: for each city, fetch the days after its newest stored day up to its last complete local
-    day, then rebuild its rows for target dates from the first new day to that day plus the horizon."""
+    day, and rebuild the feature rows those days change, plus any rows an earlier run failed to write (plan_work)."""
     config = config or load_config(root=platform.ROOT)
     now = now or datetime.now(UTC)
     horizon = int(config.get("min_shift_days") or 0)
@@ -98,25 +136,25 @@ def run_latest(now: datetime | None = None, config: dict | None = None) -> Featu
     stored = store.stored_daily(store.daily_group(fs), now.date() - timedelta(days=HISTORY_DAYS + 3))
     newest = stored.groupby("city")["date"].max().map(date.fromisoformat)
     zones = stored.groupby("city")["timezone"].first()
+    work = plan_work(newest.to_dict(), store.newest_feature_dates(fs), zones.to_dict(), now, horizon)
 
+    tuples = {c[0]: c for c in CITIES}
     windows: dict[tuple[date, date], list] = {}
-    for c in CITIES:
-        start, end = newest[c[0]] + timedelta(days=1), last_complete_day(zones[c[0]], now)
-        if start <= end:
-            windows.setdefault((start, end), []).append(c)
+    for w in work:
+        if w.fetch_from:
+            windows.setdefault((w.fetch_from, w.fetch_to), []).append(tuples[w.city])
     new = [fetch(cities, start, end) for (start, end), cities in windows.items()]
     new = pd.concat(new, ignore_index=True) if new else pd.DataFrame(columns=stored.columns)
-    report.problems = problems(new)
+    report.problems = problems(new) if len(new) else []
     if report.problems:
         report.stale_cities = sorted(newest.index)
         return report
 
-    daily = pd.concat([stored, new], ignore_index=True)
+    daily = pd.concat([stored, new], ignore_index=True) if len(new) else stored
     rows = []
-    for (start, end), cities in windows.items():
-        for name, _, _, _ in cities:
-            built = feature_rows(daily[daily["city"] == name], end + timedelta(days=horizon), config)
-            rows.append(built[built["target_date"] >= pd.Timestamp(start)])
+    for w in work:
+        built = feature_rows(daily[daily["city"] == w.city], w.rebuild_to, config)
+        rows.append(built if w.rebuild_from is None else built[built["target_date"] >= pd.Timestamp(w.rebuild_from)])
     if rows:
         _write(fs, new, pd.concat(rows, ignore_index=True), config, report)
     latest = daily.groupby("city")["date"].max().map(date.fromisoformat)
