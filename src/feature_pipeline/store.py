@@ -43,6 +43,12 @@ def feature_view(fs, fg, inputs: list[str], label: str):
                                          description="Inputs of the next day maximum temperature forecast.")
 
 
+def newest_feature_dates(fs) -> dict:
+    """The newest target date in weather_features per city, as {city: date}."""
+    df = fs.get_feature_group(*platform.WEATHER_FEATURES).select(["city", "target_date"]).read()
+    return pd.to_datetime(df["target_date"]).dt.date.groupby(df["city"]).max().to_dict()
+
+
 def stored_daily(fg, since) -> pd.DataFrame:
     """The raw daily rows on or after `since`."""
     df = fg.filter(fg.date >= pd.Timestamp(since)).read()
