@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -91,7 +91,7 @@ def run_latest(now: datetime | None = None, config: dict | None = None) -> Featu
     """The hourly job: for each city, fetch the days after its newest stored day up to its last complete local
     day, then rebuild its rows for target dates from the first new day to that day plus the horizon."""
     config = config or load_config(root=platform.ROOT)
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     horizon = int(config.get("min_shift_days") or 0)
     report = FeatureRunReport()
     fs = platform.login().get_feature_store()

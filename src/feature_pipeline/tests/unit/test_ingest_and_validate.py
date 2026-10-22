@@ -1,6 +1,6 @@
 """Each city's last complete local day, and the checks run on raw daily rows before they are written."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pandas as pd
 
@@ -9,7 +9,7 @@ from src.feature_pipeline.validate import problems
 
 
 def test_last_complete_day_is_local_to_each_city():
-    now = datetime(2026, 10, 21, 13, 30, tzinfo=timezone.utc)   # 02:30 on the 22nd in Auckland, 06:30 on the 21st in LA
+    now = datetime(2026, 10, 21, 13, 30, tzinfo=UTC)   # 02:30 on the 22nd in Auckland, 06:30 on the 21st in LA
     assert last_complete_day("Pacific/Auckland", now) == date(2026, 10, 21)
     assert last_complete_day("America/Los_Angeles", now) == date(2026, 10, 20)
     assert last_complete_day("Europe/London", now) == date(2026, 10, 20)

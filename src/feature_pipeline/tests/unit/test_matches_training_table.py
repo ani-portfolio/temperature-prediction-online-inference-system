@@ -1,4 +1,7 @@
-"""The feature pipeline builds exactly the inputs the champion was trained on (no training and serving skew)."""
+"""The feature pipeline builds exactly the inputs the champion was trained on (no training and serving skew).
+
+Reads a committed fixture, so it runs in CI: three cities' rows of the raw CSV and of features_train.parquet. If the
+features change, rebuild both from data/raw and data/processed for the same cities."""
 
 from pathlib import Path
 
@@ -10,17 +13,15 @@ from src.feature_pipeline import feature_rows
 from src.features import feature_columns, load_config
 
 ROOT = Path(__file__).resolve().parents[4]
+FIXTURES = ROOT / "tests" / "fixtures"
 CITIES = ["Auckland", "Moscow", "Bogota"]   # southern, cold northern, tropical highland
 
 
 @pytest.fixture(scope="module")
 def project():
     spec = yaml.safe_load((ROOT / "ml_spec.yaml").read_text())
-    raw = ROOT / spec["split"]["data_source"]
-    train = ROOT / spec["features"]["files"]["train"]
-    if not raw.exists() or not train.exists():
-        pytest.skip("the raw data and the feature tables are not in this checkout")
-    return load_config(spec), pd.read_csv(raw), pd.read_parquet(train)
+    return (load_config(spec), pd.read_parquet(FIXTURES / "skew_raw.parquet"),
+            pd.read_parquet(FIXTURES / "skew_train.parquet"))
 
 
 def test_rows_reproduce_the_training_feature_table(project):

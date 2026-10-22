@@ -6,7 +6,7 @@ same columns and meaning.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -16,7 +16,7 @@ from src.download_weather import CITIES, build_url, fetch_json, to_frame
 
 def last_complete_day(tz: str, now: datetime | None = None) -> date:
     """The last local calendar day that has ended in timezone tz."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     return now.astimezone(ZoneInfo(tz)).date() - timedelta(days=1)
 
 

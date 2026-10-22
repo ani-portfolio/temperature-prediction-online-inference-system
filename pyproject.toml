@@ -37,6 +37,16 @@ exclude = ["src/*/tests"]
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+runtime = [
+    "lightgbm>=4.7.0",
+    "numpy>=2.4.6",
+    "pandas>=2.3,<3",
+    "pyarrow<26",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.17.1",
 ]
 
 [tool.pytest.ini_options]
@@ -48,3 +58,7 @@ markers = [
     "component: tests of one part of the system (feature store, model registry, API) with its real dependencies",
     "system: end to end tests of the running system, from raw data to a served prediction",
 ]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["notebooks", "iterations"]

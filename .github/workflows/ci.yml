@@ -1,0 +1,39 @@
+# The checks every change passes before it can reach main, and so before it is deployed to Hopsworks.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:          # deploy.yml runs the same checks before deploying
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]   # the local .venv, and the Python of the Hopsworks environment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: The lockfile matches pyproject.toml
+        run: uv sync --locked
+      - run: uv run --frozen ruff check
+      - run: uv run --frozen python -m pytest -m unit
+
+  dry-run:
+    # What the merge would change in Hopsworks. Fork PRs get no secrets, so they skip it.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - name: Dry run of the deploy
+        run: uv run --frozen python -m deploy.apply --dry-run --ref ${{ github.event.pull_request.head.sha }}
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}

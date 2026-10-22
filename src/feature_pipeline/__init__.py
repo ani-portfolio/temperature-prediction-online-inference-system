@@ -9,7 +9,7 @@ The interface: feature_rows (pure, no network), and backfill and run_latest (the
 FeatureRunReport.
 """
 
-from src.feature_pipeline.rows import feature_rows
 from src.feature_pipeline.pipeline import FeatureRunReport, backfill, run_latest
+from src.feature_pipeline.rows import feature_rows
 
 __all__ = ["FeatureRunReport", "backfill", "feature_rows", "run_latest"]

@@ -10,7 +10,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -172,7 +172,7 @@ def main():
     df.to_csv(RAW_DIR / f"{stem}.csv", index=False)
     meta = {
         "source": API_URL,
-        "downloaded_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "downloaded_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "start_date": args.start,
         "end_date": args.end,
         "daily_variables": DAILY_VARIABLES,
