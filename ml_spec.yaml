@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-21T13:43:34'
+  updated: '2026-10-22T14:44:23'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2154,12 +2154,15 @@ system:
       settings:
         environments:
           - prod
-        secrets: the Hopsworks API key in the environment, never in code
+        secrets: 'the owner''s Hopsworks API key: the GitHub repository secret HOPSWORKS_API_KEY in CI, .env locally,
+          the platform''s own login inside jobs; never in code'
         contract: request {city}; response {city, target_date, forecast_max_c, model_version, fallback_used, inputs_as_of};
           a city outside the 50 returns an error
         rollback: switch the deployment to the previous model version, one step
-      reason: One environment is enough for a portfolio project; the component tests run against a separate Hopsworks
-        test project instead of a dev environment.
+        code_rollback: git revert on main, or the deploy workflow run by hand with an earlier commit; the model
+          version is rolled back separately, by hand
+      reason: One environment is enough for a portfolio project; the smoke check after every deploy and the predictor's
+        fallback stand in for a dev environment.
     label_feedback:
       needed: true
       tool: Daily Hopsworks job joining actuals into the feature group scored_predictions
@@ -2204,21 +2207,32 @@ system:
           - then the offline holdout test
         retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
           serving with the fallback
-      reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed.
+        deployment: 'Hopsworks Git integration: the public GitHub repo is cloned to Resources/temperature-prediction-online-inference-system;
+          a merge to main (protected: PR and passing checks) runs deploy.yml, which runs the checks, then deploy.apply
+          (checks the clone out at the tested commit, installs the runtime dependency group from uv.lock into the
+          environment weather, cloned from pandas-training-pipeline, when uv.lock changes, creates or updates the
+          jobs in each pipeline''s jobs/jobs.yaml, restarts the predictor, records Resources/deploy/state.json),
+          then deploy.smoke; PRs get a dry run of the deploy'
+        host: Hopsworks Serverless (eu-west), project weather_online_inference
+      reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed. Jobs, schedules,
+        and code reach Hopsworks only through a merge to main, so prod always runs a commit that passed CI.
     testing:
       needed: true
-      tool: pytest (tests/unit, tests/component, tests/system)
+      tool: pytest (tests/unit, tests/system) in GitHub Actions
       settings:
         unit: build_features on a small fixed history (lags never shorter than 2 days, rolling means end on the
           last complete day), the fallback rules, src/compare.py's Diebold-Mariano and block bootstrap against known
-          cases
-        component: the validation suite rejects bad batches; the feature pipeline writes the same values offline
-          and online for one city (training and serving skew); the predictor falls back on a stale row; run against
-          a separate Hopsworks test project
+          cases; the feature pipeline's rows match the training feature table on a committed fixture of three cities
+          (training and serving skew); the deploy settings and the response contract
+        ci: pytest -m unit, ruff, and uv sync --locked on Python 3.11 (local) and 3.13 (the Hopsworks environment)
+          on every PR and before every deploy
+        component: 'none: no Hopsworks test project'
+        smoke: 'after every deploy: the hourly feature job runs, and one predictor response is checked against the
+          contract'
         system: raw rows for one city through ingestion, features, the deployed predictor, and label feedback, ending
           in a scored prediction
-      reason: The skew between offline and online features is the costliest silent bug, and with prod only the component
-        tests stand in for a dev environment.
+      reason: The skew between offline and online features is the costliest silent bug, so the skew test runs in
+        CI on a fixture instead of against a test project.
   champion_dependent:
     - features
     - registry
@@ -2236,11 +2250,17 @@ system:
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
         borderline.
-    - problem: With prod only, every deployment change is first exercised live.
-      resolution: Component tests run against a separate Hopsworks test project.
+    - problem: With prod only and unit tests only, new code first meets real Hopsworks in a deploy.
+      resolution: Accepted by the user; the smoke check after each deploy and the predictor's fallback limit the
+        damage, and a revert redeploys the previous commit.
+    - problem: CI uses the owner's personal Hopsworks API key, which has every scope and is shared with local work.
+      resolution: Accepted by the user; it is a GitHub secret, never printed, and docs/deployment.md says how to
+        rotate it.
+    - problem: Local development runs Python 3.11 and the Hopsworks environment runs 3.13.
+      resolution: CI runs the unit tests on both.
   doc: docs/system_design.md
-  run_at: '2026-10-21T12:54:01'
-  doc_hash: a0fed2ee8177d9c2
+  run_at: '2026-10-22T14:44:23'
+  doc_hash: 93d2bd04cd6d150a
 iterations:
   current: null
   entries:
@@ -2497,6 +2517,16 @@ decisions:
     stage: system
     decision: When inputs are stale, serve persistence for up to 3 days, then the seasonal naive.
     reason: The user's answer to Q1 (serve the baseline), refined so every request gets a forecast.
+  - date: '2026-10-22'
+    stage: system
+    decision: 'Deploy with Hopsworks Git integration: every merge to main runs deploy.apply and deploy.smoke from
+      GitHub Actions; jobs are set in each pipeline''s jobs/jobs.yaml.'
+    reason: The user chose it while planning the deployment; see docs/deployment.md.
+  - date: '2026-10-22'
+    stage: system
+    decision: No component tests and no Hopsworks test project; the system runs on Hopsworks Serverless (eu-west)
+      in the project weather_online_inference.
+    reason: 'The user''s answer to Q5: CI runs unit tests only, including the skew test on a fixture.'
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2744,6 +2774,12 @@ history:
   - at: '2026-10-21T13:43:34'
     skill: ml-project-setup
     action: fill root from tmpjs_w9lat.json
+  - at: '2026-10-22T14:44:23'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-22T14:44:23'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
 version:
   current: V1
   branch: ml/v1
