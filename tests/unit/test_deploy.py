@@ -1,12 +1,23 @@
 """deploy: the job settings in each pipeline's jobs/jobs.yaml, the changes that make Hopsworks match them, and the
 requirements the Hopsworks environment installs."""
 
+import subprocess
+import sys
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from deploy import Change, JobState, changes, contract_problems, desired_state, load_settings, runtime_requirements
+from deploy.settings import (
+    INFERENCE_ENVIRONMENT,
+    Deployment,
+    DeploymentState,
+    deployment_changes,
+    desired_deployment,
+    src_zip,
+)
 from src import platform
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -119,7 +130,7 @@ def test_the_runtime_requirements_hold_only_what_runs_on_hopsworks():
 
 
 GOOD = {"city": "Auckland", "target_date": "2026-10-23", "forecast_max_c": 17.4, "model_version": 1,
-        "fallback_used": False, "inputs_as_of": "2026-10-21"}
+        "fallback_used": False, "fallback_reason": None, "inputs_as_of": "2026-10-21"}
 
 
 def test_a_response_that_keeps_the_contract_passes():
@@ -139,3 +150,48 @@ def test_a_response_that_breaks_the_contract_names_the_field(change, message):
 def test_a_response_missing_a_field_names_it():
     response = {k: v for k, v in GOOD.items() if k != "inputs_as_of"}
     assert any("inputs_as_of" in p for p in contract_problems(response, "Auckland"))
+
+
+def test_a_response_missing_the_fallback_reason_names_it():
+    response = {k: v for k, v in GOOD.items() if k != "fallback_reason"}
+    assert any("fallback_reason" in p for p in contract_problems(response, "Auckland"))
+
+
+DEPLOYMENT = Deployment("temperatureforecast", "temperature_max_forecast", "src/inference_pipeline/jobs/predictor.py")
+
+
+def test_the_deployment_runs_the_clone_script_in_the_inference_environment_with_logging():
+    want = desired_deployment(DEPLOYMENT)
+    assert want.script_file.endswith("/Resources/temperature-prediction-online-inference-system/"
+                                     "src/inference_pipeline/jobs/predictor.py")
+    assert want.script_file.startswith(f"/Projects/{platform.PROJECT}/")
+    assert (want.environment, want.logging) == (INFERENCE_ENVIRONMENT, "ALL")
+
+
+def test_a_missing_deployment_is_created():
+    assert deployment_changes(DEPLOYMENT.name, desired_deployment(DEPLOYMENT), None) == Change("create", DEPLOYMENT.name)
+
+
+def test_a_matching_deployment_is_only_restarted():
+    want = desired_deployment(DEPLOYMENT)
+    assert deployment_changes(DEPLOYMENT.name, want, want) == Change("same", DEPLOYMENT.name)
+
+
+def test_a_deployment_that_differs_is_updated_with_what_differs():
+    want = desired_deployment(DEPLOYMENT)
+    have = DeploymentState("/Projects/x/old.py", "pandas-inference-pipeline", "NONE")
+    change = deployment_changes(DEPLOYMENT.name, want, have)
+    assert change.action == "update"
+    assert all(f in change.detail for f in ("script_file", "environment", "logging"))
+
+
+def test_the_src_zip_holds_the_code_without_tests_and_imports(tmp_path):
+    path = tmp_path / "src.zip"
+    path.write_bytes(src_zip(ROOT))
+    names = zipfile.ZipFile(path).namelist()
+    assert "src/__init__.py" in names and "src/inference_pipeline/forecast.py" in names
+    assert not [n for n in names if "/tests/" in n or "__pycache__" in n or not n.endswith(".py")]
+    code = "import sys; sys.path.insert(0, sys.argv[1]); import src.inference_pipeline.forecast as f; print(f.__file__)"
+    out = subprocess.run([sys.executable, "-I", "-c", code, str(path)], check=False, capture_output=True, text=True, cwd=tmp_path)
+    assert out.returncode == 0, out.stderr
+    assert "src.zip" in out.stdout

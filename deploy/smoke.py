@@ -10,10 +10,10 @@ import sys
 
 from deploy.settings import load_settings
 from src import platform
+from src.inference_pipeline.forecast import CONTRACT
 
 SMOKE_JOB = "feature_pipeline_hourly"
 SMOKE_CITY = "Auckland"
-CONTRACT = ("city", "target_date", "forecast_max_c", "model_version", "fallback_used", "inputs_as_of")
 
 
 def contract_problems(response: dict, city: str) -> list[str]:

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.training_pipeline.gate import entry_test
+from src.training_pipeline.gate import GateReport, entry_test
 
 TARGET = "temperature_2m_max"
 
@@ -46,3 +46,9 @@ def test_identical_forecasts_are_rejected(holdout):
 def test_predictions_must_cover_every_holdout_row(holdout):
     with pytest.raises(ValueError, match="rows"):
         entry_test(holdout, noisy(holdout, 1, 1)[:-1], noisy(holdout, 3, 2))
+
+
+def test_a_new_challenger_reminds_the_owner_to_restart_the_deployment():
+    report = GateReport(7, "champion v3", 1.8, 2.0, {}, "challenger")
+    assert "v7" in report.next_step and "temperatureforecast" in report.next_step
+    assert GateReport(7, "champion v3", 2.1, 2.0, {}, "rejected").next_step == ""

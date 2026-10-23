@@ -28,6 +28,13 @@ class GateReport:
     dm: dict
     status: str             # 'challenger' or 'rejected'
 
+    @property
+    def next_step(self) -> str:
+        """What the owner does next: the predictor reads the tags only at startup."""
+        if self.status != "challenger":
+            return ""
+        return f"Restart the deployment {platform.DEPLOYMENT} to shadow v{self.model_version}."
+
 
 def entry_test(holdout: pd.DataFrame, candidate, reference, alpha: float = 0.05,
                target: str = TARGET) -> tuple[str, dict]:
