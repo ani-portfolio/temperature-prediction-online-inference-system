@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-22T14:44:23'
+saved_at: '2026-10-23T14:59:28'
 command:
   - design.py
-  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/836254e6-3956-4c10-b965-d69be2873557/scratchpad/system_answers.yaml
+  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/c5016d0e-eaee-4596-90d8-d9d8de1e7ce9/scratchpad/system_answers.yaml
 answers:
   status: confirmed
   platform:
@@ -125,13 +125,18 @@ answers:
       settings:
         mode: online
         schedule: on_request
-        steps: look up the city's latest feature row, check it is for tomorrow's target date (else the fallback),
-          predict with the champion and every shadow model
-        logging: one row per model per request in the feature group predictions (request id and time, city, target
-          date, model name and version, prediction, served or shadow, fallback used, feature row version, the persistence
+        steps: 'at startup, read the lifecycle_status tags: the champion serves, and the challengers plus models
+          tagged retiring less than 28 days ago predict in shadow; per request, one batch lookup in the online feature
+          view of the city''s rows for tomorrow (its local date plus one), the three days before, and tomorrow minus
+          362 days (the seasonal row); a fresh row for tomorrow goes to the champion and every shadow, otherwise
+          the fallback'
+        logging: the KServe inference logger (mode ALL) writes every request and response to the deployment's Kafka
+          topic; the job inference_pipeline_log reads it every 6 hours and writes one row per model per answered
+          city to the offline feature group predictions (key request id and model version; request time, city, target
+          date, served or shadow, prediction, fallback used and reason, inputs as of, feature row, the persistence
           forecast)
-        dedup: one prediction per city, target date, and model for the gate and monitoring, since repeat requests
-          on a day use the same features
+        dedup: label feedback keeps the first row per city, target date, and model, since repeat requests on a day
+          use the same features
       reason: Online inference is the learning goal and the framing's cadence; logging every model's prediction
         is what the gate and monitoring read.
     serving:
@@ -142,9 +147,13 @@ answers:
           - prod
         secrets: 'the owner''s Hopsworks API key: the GitHub repository secret HOPSWORKS_API_KEY in CI, .env locally,
           the platform''s own login inside jobs; never in code'
-        contract: request {city}; response {city, target_date, forecast_max_c, model_version, fallback_used, inputs_as_of};
-          a city outside the 50 returns an error
-        rollback: switch the deployment to the previous model version, one step
+        contract: request {city}; response {city, target_date, forecast_max_c, model_version, fallback_used, fallback_reason,
+          inputs_as_of, log}, where fallback_reason is model_error, stale, awaiting_today, seasonal, or no_champion,
+          and log holds request_id, persistence_c, feature_row, and the shadow predictions for the inference logger;
+          a city outside the 50, or one with no row to forecast from, gets {city, error} without failing the other
+          cities in the request
+        rollback: retag by hand (the previous champion back to champion, the bad one to retiring or rejected), then
+          restart the deployment; the deployment's model version only links it to the registry
         code_rollback: git revert on main, or the deploy workflow run by hand with an earlier commit; the model
           version is rolled back separately, by hand
       reason: One environment is enough for a portfolio project; the smoke check after every deploy and the predictor's
@@ -175,11 +184,13 @@ answers:
       needed: true
       tool: Fallback in the predictor script
       settings:
-        fallback: persistence from the newest complete day when inputs are stale by up to 3 days or the model fails;
-          the seasonal naive (the same date last year) when inputs are more than 3 days old
-        flags: fallback_used and inputs_as_of in every response
+        fallback: persistence from the newest complete day when inputs are stale by up to 3 days, when the model
+          fails, or when no model is tagged champion; the seasonal naive (the maximum 364 days before tomorrow)
+          when inputs are more than 3 days old; just after local midnight, before the feature job has written tomorrow's
+          row, persistence with the reason awaiting_today
+        flags: fallback_used, fallback_reason, and inputs_as_of in every response
         target: every request for one of the 50 cities gets a forecast; at least 95% of a day's requests are served
-          by the model
+          by the model, not counting awaiting_today
       reason: Persistence is the baseline the model must beat (the user's answer to Q1); it degrades with age, so
         the seasonal value takes over after 3 days.
     orchestration:
@@ -196,9 +207,13 @@ answers:
         deployment: 'Hopsworks Git integration: the public GitHub repo is cloned to Resources/temperature-prediction-online-inference-system;
           a merge to main (protected: PR and passing checks) runs deploy.yml, which runs the checks, then deploy.apply
           (checks the clone out at the tested commit, installs the runtime dependency group from uv.lock into the
-          environment weather, cloned from pandas-training-pipeline, when uv.lock changes, creates or updates the
-          jobs in each pipeline''s jobs/jobs.yaml, restarts the predictor, records Resources/deploy/state.json),
-          then deploy.smoke; PRs get a dry run of the deploy'
+          environments weather (jobs, cloned from pandas-training-pipeline) and weather-inference (the predictor,
+          cloned from pandas-inference-pipeline, since deployments need an inference image) when uv.lock changes,
+          uploads src/ as Resources/deploy/src.zip for the predictor, creates or updates the jobs in each pipeline''s
+          jobs/jobs.yaml, creates or updates the deployment temperatureforecast (inference logging on) and restarts
+          it, records Resources/deploy/state.json), then deploy.smoke; PRs get a dry run of the deploy; tag changes
+          (promotion, rollback, a new challenger) take effect when the deployment restarts, which the owner does
+          by hand'
         host: Hopsworks Serverless (eu-west), project weather_online_inference
       reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed. Jobs, schedules,
         and code reach Hopsworks only through a merge to main, so prod always runs a commit that passed CI.
@@ -235,16 +250,24 @@ answers:
       a refit trains on it and it has been opened 3 times, so a recent 28 day holdout is used.
     training: The user chose refits on drift or by hand over a monthly schedule.
     inference: Only requested cities are scored, so the gate's live comparison depends on traffic; this is recorded
-      as a risk.
+      as a risk. While planning the build, the user chose the registry tags over the deployment's model version
+      to decide the champion, so the registry alone shows which model serves, and chose to read them only at startup
+      and restart by hand. The user chose the KServe inference logger plus a 6 hourly job over writing the log from
+      the predictor, for durability; a spike confirmed it works on Hopsworks Serverless.
     serving: The user chose prod only; the draft had dev and prod. The user later chose to use their personal API
-      key for CI.
+      key for CI. Rollback is now a tag change and a restart rather than a version switch, which follows from the
+      tags deciding the champion. Errors are per city so one bad city does not fail a batch request.
     monitoring: The user dropped the weekly archive revision check.
     failure_handling: The user changed the draft so the seasonal naive takes over after 3 days instead of an error
-      after 7, so every request gets a forecast.
-    orchestration: The user chose Hopsworks Git integration over a versioned wheel, with merges to main deploying
+      after 7, so every request gets a forecast. While planning the build, the user added persistence when no model
+      is tagged champion, and the awaiting_today reason so the short gap after local midnight does not count against
+      the 95% target.
+    orchestration: 'The user chose Hopsworks Git integration over a versioned wheel, with merges to main deploying
       automatically. A spike showed jobs run in place on the /hopsfs mount, so job scripts import src from the clone
       by putting the repo root on sys.path. The Hopsworks environment runs Python 3.13, so CI tests 3.11 and 3.13.
-      See docs/deployment.md.
+      See docs/deployment.md. A later spike showed predictor pods are different: the script is copied into the pod,
+      HopsFS is not mounted, and the training environment is refused, so deploy ships src/ as a zip the predictor
+      downloads at startup and keeps a second, inference environment with the same pins.'
     testing: The draft ran component tests against a separate Hopsworks test project. The user dropped component
       tests and the test project; the skew test moved to unit tests on a committed fixture, and a smoke check after
       each deploy catches what only real Hopsworks would show.
@@ -254,7 +277,8 @@ answers:
       resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
     - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
         may take months to reach significance.
-      resolution: If the gate stalls, add a daily scheduled request for all 50 cities.
+      resolution: The owner runs a separate service that requests forecasts to mimic traffic; it should cover every
+        city every day, after the gap after local midnight.
     - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
@@ -267,9 +291,19 @@ answers:
         rotate it.
     - problem: Local development runs Python 3.11 and the Hopsworks environment runs 3.13.
       resolution: CI runs the unit tests on both.
+    - problem: The predictor reads the registry tags only at startup, so a new challenger, a promotion, or a rollback
+        has no effect until the deployment is restarted by hand.
+      resolution: Accepted by the user; the gate job prints a reminder to restart when it makes a challenger, and
+        docs/deployment.md lists the promotion and rollback steps.
+    - problem: When the online feature store cannot be reached, the request fails with HTTP 500, since a KServe
+        Python predictor cannot set its own status code.
+      resolution: Accepted; monitoring counts predictor errors, and the city level errors cover every other failure.
   assumptions:
     - The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
-  open_questions: []
+  open_questions:
+    - question: How long after local midnight does the hourly feature job write each city's row for tomorrow? The
+        predictor treats a missing row as awaiting_today until 03:00 local, a placeholder until this is measured.
+      stage: system
   decisions:
     - decision: Use Hopsworks for the deployed system, including the registry, champion, and challenger; MLflow
         keeps local experiments.
@@ -287,3 +321,8 @@ answers:
     - decision: No component tests and no Hopsworks test project; the system runs on Hopsworks Serverless (eu-west)
         in the project weather_online_inference.
       reason: 'The user''s answer to Q5: CI runs unit tests only, including the skew test on a fixture.'
+    - decision: The lifecycle_status tags decide the champion and the shadows (challengers, and former champions
+        tagged retiring for 28 days); the predictor reads them at startup, and the owner restarts it by hand.
+      reason: 'The user''s choice while planning the inference pipeline: one place shows which model serves.'
+    - decision: Log predictions with the KServe inference logger and a 6 hourly job into the feature group predictions.
+      reason: The user chose durability and no logging code in the predictor; a spike confirmed it on Serverless.
