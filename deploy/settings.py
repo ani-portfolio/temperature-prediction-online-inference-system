@@ -14,6 +14,7 @@ REPO_URL = "https://github.com/ani-portfolio/temperature-prediction-online-infer
 CLONE_DIR = "Resources/temperature-prediction-online-inference-system"
 ENVIRONMENT = "weather"
 BASE_ENVIRONMENT = "pandas-training-pipeline"   # has scikit-learn; the runtime group adds lightgbm and the pins
+SRC_ZIP = "Resources/deploy/src.zip"            # src/ at the deployed commit, for the predictor (no HopsFS in pods)
 
 JOB_KEYS = {"script", "args", "schedule", "memory_mb", "cores"}
 DEPLOYMENT_KEYS = {"name", "model", "script"}

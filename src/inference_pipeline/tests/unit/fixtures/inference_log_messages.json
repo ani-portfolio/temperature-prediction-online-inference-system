@@ -1,0 +1,7 @@
+{
+  "source": "logging spike on weather_online_inference, 2026-10-23: one request to an echo predictor; the raw Kafka values of the deployment's inference log topic, base64 encoded",
+  "messages": [
+    "iJADGmxvZ2dpbmdfc3Bpa2UC6pPdrQ2QA0gxNDU5ODA4NS1iZWZjLTQxNzUtYTFlMC1kOWQxODNlZjZlZTlMb3JnLmt1YmVmbG93LnNlcnZpbmcuaW5mZXJlbmNlLnJlcXVlc3RKeyJpbnN0YW5jZXMiOiBbeyJjaXR5IjogIkF1Y2tsYW5kIn1dfQ==",
+    "iJADGmxvZ2dpbmdfc3Bpa2UC6pPdrQ2QA0gxNDU5ODA4NS1iZWZjLTQxNzUtYTFlMC1kOWQxODNlZjZlZTlOb3JnLmt1YmVmbG93LnNlcnZpbmcuaW5mZXJlbmNlLnJlc3BvbnNllAJ7InByZWRpY3Rpb25zIjpbeyJjaXR5IjoiQXVja2xhbmQiLCJmb3JlY2FzdF9tYXhfYyI6MTguNCwibG9nIjp7InJlcXVlc3RfaWQiOiJzcGlrZSIsInNoYWRvd3MiOlt7Im1vZGVsX3ZlcnNpb24iOjQsInByZWRpY3Rpb24iOjE5LjB9XX19XX0="
+  ]
+}

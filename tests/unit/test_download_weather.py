@@ -1,10 +1,31 @@
 import urllib.parse
+from zoneinfo import ZoneInfo
 
-from src.download_weather import CITIES, DAILY_VARIABLES, build_url, to_frame
+import pandas as pd
+import pytest
+import yaml
+
+from src import platform
+from src.download_weather import CITIES, DAILY_VARIABLES, TIMEZONES, build_url, to_frame
 
 
 def test_city_names_are_unique():
     assert len({name for name, *_ in CITIES}) == len(CITIES) == 50
+
+
+def test_every_city_has_a_valid_timezone():
+    assert set(TIMEZONES) == {name for name, *_ in CITIES}
+    for tz in TIMEZONES.values():
+        ZoneInfo(tz)
+
+
+def test_timezones_match_the_raw_data():
+    spec = yaml.safe_load((platform.ROOT / "ml_spec.yaml").read_text())
+    raw = platform.ROOT / spec["split"]["data_source"]
+    if not raw.exists():
+        pytest.skip("data/raw is not in git")
+    seen = pd.read_csv(raw, usecols=["city", "timezone"]).drop_duplicates()
+    assert dict(zip(seen["city"], seen["timezone"])) == TIMEZONES
 
 
 def test_build_url_lists_every_city_and_variable():

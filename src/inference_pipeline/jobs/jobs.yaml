@@ -1,0 +1,13 @@
+# The Hopsworks job and the deployment of the inference pipeline, applied by `python -m deploy.apply` on every merge
+# to main. The deployment's model only links it to the registry: the predictor serves the model tagged champion.
+jobs:
+  inference_pipeline_log:
+    script: log.py               # relative to this jobs/ folder
+    args: ""
+    schedule: "0 30 */6 * * ?"   # Quartz cron in UTC: every 6 hours at :30, clear of the hourly feature job at :15
+    memory_mb: 2048
+    cores: 1
+deployment:
+  name: temperatureforecast      # src.platform.DEPLOYMENT
+  model: temperature_max_forecast
+  script: predictor.py

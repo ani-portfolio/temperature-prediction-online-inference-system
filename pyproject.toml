@@ -40,6 +40,8 @@ dev = [
     "ruff>=0.17.1",
 ]
 runtime = [
+    "confluent-kafka>=2.15.1",
+    "fastavro>=1.12.1",
     "lightgbm>=4.7.0",
     "numpy>=2.4.6",
     "pandas>=2.3,<3",

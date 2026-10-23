@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from deploy import Change, JobState, changes, contract_problems, desired_state, load_settings, runtime_requirements
+from src import platform
 
 ROOT = Path(__file__).resolve().parents[2]
 HOURLY = """
@@ -73,8 +74,10 @@ def test_the_deployment_is_read_from_the_inference_pipeline(tmp_path):
 
 
 def test_the_project_settings_load():
-    names = [job.name for job in load_settings(ROOT).jobs]
-    assert "feature_pipeline_hourly" in names
+    settings = load_settings(ROOT)
+    names = [job.name for job in settings.jobs]
+    assert {"feature_pipeline_hourly", "inference_pipeline_log"} <= set(names)
+    assert (settings.deployment.name, settings.deployment.model) == (platform.DEPLOYMENT, platform.MODEL)
 
 
 @pytest.fixture

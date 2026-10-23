@@ -16,6 +16,8 @@ WEATHER_DAILY = ("weather_daily", 1)          # raw daily weather per city and l
 WEATHER_FEATURES = ("weather_features", 1)    # model inputs and target per city and target date
 FEATURE_VIEW = ("temperature_max_forecast", 1)
 MODEL = "temperature_max_forecast"
+DEPLOYMENT = "temperatureforecast"            # KServe deployment names are letters and digits only
+PREDICTIONS = ("predictions", 1)              # every model's prediction per answered request, from the log job
 
 
 def api_key() -> str | None:

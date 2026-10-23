@@ -49,3 +49,22 @@ read from `.env`. Rotating it means updating both: create a new key in Hopsworks
   and the predictor's fallback limit the damage.
 * The CI key has every scope of the owner's account and is shared with local work.
 * Local development is on Python 3.11, Hopsworks runs 3.13; CI tests both.
+
+## Inference logging
+A spike on 2026-10-23 (a throwaway echo predictor, since deleted) confirmed on Hopsworks Serverless:
+* A deployment created with `inference_logger=InferenceLogger()` logs `ALL` to a Kafka topic made for it
+  (`<deployment>-inf<NNNN>`). A plain dict such as `{"mode": "ALL"}` is read as no logging.
+* Each request writes two messages, the request and the response, with the same inference id. Each value is an Avro
+  record with no schema registered on the topic, in this field order: modelId (int), modelName (string),
+  modelVersion (int), requestTimestamp (long, Unix seconds), responseHttpCode (int), inferenceId (string),
+  messageType (string, `org.kubeflow.serving.inference.request` or `.response`), payload (string, the JSON body).
+  A nested `log` block in the response arrives intact. Samples: `src/inference_pipeline/tests/unit/fixtures/`.
+* A Hopsworks Python job reads the topic with `confluent_kafka` and `project.get_kafka_api().get_default_config()`.
+* A predictor script's `Predict.__init__` may only take the parameters `project`, `deployment`, `model`, and
+  `async_logger`; anything else, `*args` included, stops the predictor from starting.
+* Predictor pods do not run in place: the script is copied to `/mnt/artifacts/`, and HopsFS is **not** mounted
+  (`/hopsfs` is empty), so the clone is out of reach. Deploy uploads `src/` as `Resources/deploy/src.zip`, and the
+  predictor downloads it at startup and imports from it.
+* A deployment needs an environment built on an inference image: `weather` (a training image) is refused. The
+  predictor runs in `weather-inference`, cloned from `pandas-inference-pipeline` (Python 3.13, no lightgbm), with the
+  same runtime group as `weather`, so models trained in jobs unpickle in the predictor.
