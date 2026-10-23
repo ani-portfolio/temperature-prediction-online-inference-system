@@ -15,7 +15,10 @@ from src.training_pipeline import run_gate
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--version", type=int, required=True, help="the model version to judge")
-    print(run_gate(parser.parse_args(argv).version))
+    report = run_gate(parser.parse_args(argv).version)
+    print(report)
+    if report.next_step:
+        print(report.next_step)
     return 0
 
 

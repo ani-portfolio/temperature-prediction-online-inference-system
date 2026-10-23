@@ -1,9 +1,10 @@
 """Make the Hopsworks project run one commit of this repo: python -m deploy.apply [--ref SHA] [--dry-run]
 
-In order: check the clone out at the commit, install the runtime requirements into the environment when uv.lock
-changed, create or update every job in the settings, restart the predictor, and record what was deployed. A dry
-run reads the project and prints what it would do. Jobs are never deleted, and the model a deployment serves is
-never changed: promotion stays by hand."""
+In order: check the clone out at the commit, install the runtime requirements into both environments (weather for
+jobs, weather-inference for the predictor) when uv.lock changed, upload src/ as the zip the predictor imports, create
+or update every job in the settings, create or update the deployment and restart it, and record what was deployed.
+A dry run reads the project and prints what it would do. Jobs are never deleted. The deployment's model only links it
+to the registry: the predictor serves the model tagged champion, so promotion stays by hand."""
 
 from __future__ import annotations
 
@@ -18,15 +19,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from deploy.settings import (
-    BASE_ENVIRONMENT,
     CLONE_DIR,
-    ENVIRONMENT,
+    ENVIRONMENTS,
     REPO_URL,
+    SRC_ZIP,
     Change,
+    DeploymentState,
     JobState,
     changes,
+    deployment_changes,
+    desired_deployment,
     desired_state,
     load_settings,
+    src_zip,
 )
 from src import platform
 
@@ -39,11 +44,15 @@ class DeployReport:
     dry_run: bool
     steps: list[str] = field(default_factory=list)
     changes: list[Change] = field(default_factory=list)
+    deployment: Change | None = None
     problems: list[str] = field(default_factory=list)
 
     def __str__(self):
         lines = [f"{'Dry run of the deploy' if self.dry_run else 'Deploy'} of {self.ref}", *self.steps]
         lines += [f"job {c.job}: {c.action}{' (' + c.detail + ')' if c.detail else ''}" for c in self.changes]
+        if self.deployment:
+            c = self.deployment
+            lines.append(f"deployment {c.job}: {c.action}{' (' + c.detail + ')' if c.detail else ''}")
         lines += [f"PROBLEM: {p}" for p in self.problems]
         return "\n".join(lines)
 
@@ -76,11 +85,15 @@ def _read_state(project) -> dict:
         return json.loads(Path(datasets.download(STATE, tmp, overwrite=True)).read_text())
 
 
-def _upload_text(project, text: str, name: str) -> str:
+def _upload_bytes(project, data: bytes, name: str) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         local = Path(tmp) / name
-        local.write_text(text)
+        local.write_bytes(data)
         return project.get_dataset_api().upload(str(local), str(Path(STATE).parent), overwrite=True)
+
+
+def _upload_text(project, text: str, name: str) -> str:
+    return _upload_bytes(project, text.encode(), name)
 
 
 def _sync_clone(project, ref, report):
@@ -99,20 +112,32 @@ def _sync_clone(project, ref, report):
     report.steps.append(f"clone: checked out {ref}")
 
 
-def _sync_environment(project, root, state, report):
+def _sync_environments(project, root, state, report):
     envs = project.get_environment_api()
-    env = envs.get_environment(ENVIRONMENT)
-    stale = env is None or state.get("lock_hash") != lock_hash(root)
+    changed = state.get("lock_hash") != lock_hash(root)
+    requirements = None
+    for name, base in ENVIRONMENTS.items():
+        env = envs.get_environment(name)
+        stale = env is None or changed
+        if report.dry_run:
+            report.steps.append(f"environment {name}: would {'create' if env is None else 'keep'}"
+                                f"{' and install the runtime requirements' if stale else ''}")
+            continue
+        if env is None:
+            env = envs.create_environment(name, base_environment_name=base)
+            report.steps.append(f"environment {name}: created from {base}")
+        if stale:
+            requirements = requirements or _upload_text(project, runtime_requirements(root), "requirements.txt")
+            env.install_requirements(requirements)
+            report.steps.append(f"environment {name}: installed the runtime requirements")
+
+
+def _upload_src(project, root, report):
     if report.dry_run:
-        report.steps.append(f"environment {ENVIRONMENT}: would {'create' if env is None else 'keep'}"
-                            f"{' and install the runtime requirements' if stale else ''}")
+        report.steps.append(f"{SRC_ZIP}: would upload src/ for the predictor")
         return
-    if env is None:
-        env = envs.create_environment(ENVIRONMENT, base_environment_name=BASE_ENVIRONMENT)
-        report.steps.append(f"environment {ENVIRONMENT}: created from {BASE_ENVIRONMENT}")
-    if stale:
-        env.install_requirements(_upload_text(project, runtime_requirements(root), "requirements.txt"))
-        report.steps.append(f"environment {ENVIRONMENT}: installed the runtime requirements")
+    _upload_bytes(project, src_zip(root), Path(SRC_ZIP).name)
+    report.steps.append(f"{SRC_ZIP}: uploaded")
 
 
 def _sync_jobs(project, settings, report):
@@ -135,19 +160,52 @@ def _sync_jobs(project, settings, report):
             made.unschedule()
 
 
-def _restart_predictor(project, settings, report):
+def _live_deployment(deployment) -> DeploymentState:
+    logger = deployment.inference_logger
+    return DeploymentState(deployment.script_file or "", deployment.environment or "",
+                           (logger.mode if logger else None) or "NONE")
+
+
+def _sync_deployment(project, settings, report):
+    """Create the deployment when it is missing, update the settings that differ, and restart it so it loads the
+    new code and reads the registry tags again."""
     if settings.deployment is None:
         return
-    name = settings.deployment.name
-    deployment = project.get_model_serving().get_deployment(name)
-    if deployment is None:
-        report.problems.append(f"deployment {name} does not exist; create it with the inference pipeline first")
-    elif report.dry_run:
-        report.steps.append(f"deployment {name}: would restart to load the new code")
-    else:
-        deployment.stop()
+    from hsml.inference_logger import InferenceLogger
+
+    conf = settings.deployment
+    serving = project.get_model_serving()
+    deployment = serving.get_deployment(conf.name)
+    want = desired_deployment(conf)
+    change = deployment_changes(conf.name, want, deployment and _live_deployment(deployment))
+    report.deployment = change
+    if change.action == "create":
+        models = project.get_model_registry().get_models(conf.model) or []
+        if not models:
+            report.problems.append(f"deployment {conf.name}: no version of {conf.model} is registered; run the "
+                                   f"train job once first")
+            return
+        if report.dry_run:
+            return
+        newest = max(models, key=lambda m: m.version)
+        predictor = serving.create_predictor(newest, name=conf.name, script_file=want.script_file,
+                                             environment=want.environment, inference_logger=InferenceLogger())
+        deployment = serving.create_deployment(predictor, name=conf.name)
+        deployment.save()
         deployment.start()
-        report.steps.append(f"deployment {name}: restarted")
+        report.steps.append(f"deployment {conf.name}: created, linked to {conf.model} v{newest.version}, started")
+        return
+    if report.dry_run:
+        report.steps.append(f"deployment {conf.name}: would restart to load the new code")
+        return
+    if change.action == "update":
+        deployment.script_file = want.script_file
+        deployment.environment = want.environment
+        deployment.inference_logger = InferenceLogger()
+        deployment.save()
+    deployment.stop()
+    deployment.start()
+    report.steps.append(f"deployment {conf.name}: restarted")
 
 
 def apply(ref: str, dry_run: bool = False, root: Path = platform.ROOT) -> DeployReport:
@@ -157,9 +215,10 @@ def apply(ref: str, dry_run: bool = False, root: Path = platform.ROOT) -> Deploy
     state = _read_state(project)
     report.steps.append(f"deployed now: {state.get('sha')} at {state.get('deployed_at')}")
     _sync_clone(project, ref, report)
-    _sync_environment(project, root, state, report)
+    _sync_environments(project, root, state, report)
+    _upload_src(project, root, report)
     _sync_jobs(project, settings, report)
-    _restart_predictor(project, settings, report)
+    _sync_deployment(project, settings, report)
     if not dry_run and not report.problems:
         record = {"sha": ref, "lock_hash": lock_hash(root), "deployed_at": datetime.now(UTC).isoformat()}
         _upload_text(project, json.dumps(record, indent=2), Path(STATE).name)

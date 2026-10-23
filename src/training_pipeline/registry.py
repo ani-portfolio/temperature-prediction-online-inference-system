@@ -1,8 +1,7 @@
 """The training pipeline's side of Hopsworks: training data from the feature view, and models in the registry.
 
-Each model's state lives in its lifecycle_status tag, a JSON string (the cluster's tag schema is a plain string):
-{"status": "candidate" | "challenger" | "rejected" | "champion", "window": {...}, "lineage": {...}, "gate": {...}}.
-Promotion is by hand, by setting the status to champion; a tag holding just the word champion counts too.
+Each model's state lives in its lifecycle_status tag, read and written through src.registry:
+{"status": ..., "window": {...}, "lineage": {...}, "gate": {...}}. This module adds the training pipeline's fields.
 """
 
 from __future__ import annotations
@@ -17,10 +16,11 @@ import joblib
 import pandas as pd
 
 from src import platform
+from src.registry import MODEL_FILE, STATUS_TAG, champion, load, record
 from src.training_pipeline.window import TrainingWindow
 
-STATUS_TAG = "lifecycle_status"
-MODEL_FILE = "model.joblib"
+__all__ = ["Split", "champion", "feature_view", "load", "newest_labelled", "read_holdout", "read_split", "record",
+           "register", "set_status", "window_of"]
 
 
 @dataclass
@@ -86,18 +86,6 @@ def register(project, fv, model, split: Split, window: TrainingWindow, lineage: 
     return hs_model.version
 
 
-def record(model) -> dict:
-    """A model's lifecycle_status tag as a dict; {} when it has none."""
-    value = (model.get_tags() or {}).get(STATUS_TAG)
-    if value is None:
-        return {}
-    try:
-        parsed = json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        parsed = value
-    return parsed if isinstance(parsed, dict) else {"status": str(parsed).strip()}
-
-
 def window_of(model) -> TrainingWindow:
     w = record(model).get("window")
     if not w:
@@ -107,16 +95,3 @@ def window_of(model) -> TrainingWindow:
 
 def set_status(model, status: str, gate: dict):
     model.add_tag(STATUS_TAG, json.dumps({**record(model), "status": status, "gate": gate}))
-
-
-def champion(mr):
-    """The model tagged champion, or None before there is one. Two champions is an error to fix by hand."""
-    found = [m for m in mr.get_models(platform.MODEL) or [] if record(m).get("status") == "champion"]
-    if len(found) > 1:
-        raise ValueError(f"Versions {', '.join(str(m.version) for m in found)} are all tagged champion; keep one.")
-    return found[0] if found else None
-
-
-def load(model):
-    """The fitted pipeline of a registered model."""
-    return joblib.load(Path(model.download()) / MODEL_FILE)

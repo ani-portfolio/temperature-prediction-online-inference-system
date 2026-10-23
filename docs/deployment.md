@@ -11,14 +11,17 @@ How code reaches the Hopsworks project `weather_online_inference`, and how to ro
 
 `deploy.apply` makes the project run exactly one commit:
 * the clone at `Resources/temperature-prediction-online-inference-system` is checked out at that commit;
-* the environment `weather` (cloned from `pandas-training-pipeline`, Python 3.13) gets the `runtime` dependency
-  group from `uv.lock`, only when `uv.lock` changed;
+* the environments `weather` (jobs, cloned from `pandas-training-pipeline`) and `weather-inference` (the predictor,
+  cloned from `pandas-inference-pipeline`), both Python 3.13, get the `runtime` dependency group from `uv.lock`, only
+  when `uv.lock` changed;
+* `src/` (without tests) is uploaded as `Resources/deploy/src.zip`, which the predictor imports from;
 * every job in `src/*/jobs/jobs.yaml` is created or updated, with its schedule;
-* the predictor restarts, once the inference pipeline has a deployment;
+* the deployment `temperatureforecast` is created (linked to the newest registered model version, with inference
+  logging) or updated, then restarted;
 * `Resources/deploy/state.json` records the commit, the lock hash, and the time.
 
-It never deletes a job (a job in the clone with no settings is reported as `unmanaged`; delete it by hand) and
-never changes the model version a deployment serves: promotion stays by hand.
+It never deletes a job (a job in the clone with no settings is reported as `unmanaged`; delete it by hand) and never
+decides which model serves: the predictor serves the model tagged champion, so promotion stays by hand.
 
 `deploy.smoke` runs the hourly feature job and, once there is a deployment, checks one forecast against the
 contract in `docs/system_design.md`.
@@ -33,11 +36,23 @@ Add it to the pipeline's `jobs/jobs.yaml` (`script`, and optionally `args`, `sch
 `uv add <package>` for the project, and `uv add --group runtime <package>` if it runs on Hopsworks. Leave out
 `hopsworks` and `great-expectations`: the base environment has matched versions.
 
-## Rolling back
-* Usually: `git revert` the change on `main`; the revert deploys like any merge.
-* Quickly: Actions, deploy, Run workflow, with `ref` set to an earlier commit of `main`.
+## Promoting a model
+The predictor reads each model's `lifecycle_status` tag only when it starts, so every change below ends with a
+restart (`project.get_model_serving().get_deployment("temperatureforecast")`, then `.stop()` and `.start()`).
+1. Tag the new champion `{"status": "champion", ...}`, keeping the rest of its record.
+2. Tag the previous champion `{"status": "retiring", "since": "<today>", ...}`: it predicts in shadow for 28 days.
+3. Restart the deployment. Between steps 1 and 2 there are two champions, which stops a restart, so do both first.
 
-The predictor keeps serving the champion, with its fallback, while a deploy is broken.
+A new challenger from the gate job is shadowed only after a restart; the gate job prints a reminder.
+
+## Rolling back
+* A model: tag the bad champion `rejected` (or `retiring` with today's date), tag the previous one `champion`, then
+  restart the deployment.
+* Code, usually: `git revert` the change on `main`; the revert deploys like any merge.
+* Code, quickly: Actions, deploy, Run workflow, with `ref` set to an earlier commit of `main`.
+
+The predictor keeps serving the champion, with its fallback, while a deploy is broken. With no model tagged
+champion it serves persistence (`fallback_reason: no_champion`).
 
 ## The API key
 CI uses the owner's personal Hopsworks API key, stored as the repository secret `HOPSWORKS_API_KEY`; locally it is
@@ -49,3 +64,22 @@ read from `.env`. Rotating it means updating both: create a new key in Hopsworks
   and the predictor's fallback limit the damage.
 * The CI key has every scope of the owner's account and is shared with local work.
 * Local development is on Python 3.11, Hopsworks runs 3.13; CI tests both.
+
+## Inference logging
+A spike on 2026-10-23 (a throwaway echo predictor, since deleted) confirmed on Hopsworks Serverless:
+* A deployment created with `inference_logger=InferenceLogger()` logs `ALL` to a Kafka topic made for it
+  (`<deployment>-inf<NNNN>`). A plain dict such as `{"mode": "ALL"}` is read as no logging.
+* Each request writes two messages, the request and the response, with the same inference id. Each value is an Avro
+  record with no schema registered on the topic, in this field order: modelId (int), modelName (string),
+  modelVersion (int), requestTimestamp (long, Unix seconds), responseHttpCode (int), inferenceId (string),
+  messageType (string, `org.kubeflow.serving.inference.request` or `.response`), payload (string, the JSON body).
+  A nested `log` block in the response arrives intact. Samples: `src/inference_pipeline/tests/unit/fixtures/`.
+* A Hopsworks Python job reads the topic with `confluent_kafka` and `project.get_kafka_api().get_default_config()`.
+* A predictor script's `Predict.__init__` may only take the parameters `project`, `deployment`, `model`, and
+  `async_logger`; anything else, `*args` included, stops the predictor from starting.
+* Predictor pods do not run in place: the script is copied to `/mnt/artifacts/`, and HopsFS is **not** mounted
+  (`/hopsfs` is empty), so the clone is out of reach. Deploy uploads `src/` as `Resources/deploy/src.zip`, and the
+  predictor downloads it at startup and imports from it.
+* A deployment needs an environment built on an inference image: `weather` (a training image) is refused. The
+  predictor runs in `weather-inference`, cloned from `pandas-inference-pipeline` (Python 3.13, no lightgbm), with the
+  same runtime group as `weather`, so models trained in jobs unpickle in the predictor.
