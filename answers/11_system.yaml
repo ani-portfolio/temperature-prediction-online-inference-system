@@ -2,7 +2,7 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-23T14:59:28'
+saved_at: '2026-10-26T15:04:08'
 command:
   - design.py
   - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/c5016d0e-eaee-4596-90d8-d9d8de1e7ce9/scratchpad/system_answers.yaml
@@ -20,14 +20,15 @@ answers:
       needed: true
       tool: Hopsworks job (Python) writing to the feature group weather_daily
       settings:
-        frequency: hourly
+        frequency: daily
+        time: 12:15 UTC, when every city has passed local midnight (the job keeps the name feature_pipeline_hourly)
         source: Open-Meteo archive API, all 50 cities in one batched request per run
         limits: Open-Meteo free tier (non commercial; per minute, hourly, and daily request caps), one request per
           run
         fetch: the newest day only
         feature_group: weather_daily (primary key city, event time date)
-      reason: The 50 cities close their local day at different UTC hours, so an hourly run keeps each city's last
-        complete day available soon after it ends, for requests that arrive at any time.
+      reason: One run a day at 12:15 UTC writes a fresh row for tomorrow in every city, since all 50 have passed
+        local midnight by then; each row stays fresh until that city's next local midnight.
     data_validation:
       needed: true
       tool: Great Expectations suite attached to weather_daily (strict ingestion policy)
@@ -186,8 +187,8 @@ answers:
       settings:
         fallback: persistence from the newest complete day when inputs are stale by up to 3 days, when the model
           fails, or when no model is tagged champion; the seasonal naive (the maximum 364 days before tomorrow)
-          when inputs are more than 3 days old; just after local midnight, before the feature job has written tomorrow's
-          row, persistence with the reason awaiting_today
+          when inputs are more than 3 days old; from local midnight until the next daily feature run writes tomorrow's
+          row (inputs one day old), persistence with the reason awaiting_today; two or three days old is stale
         flags: fallback_used, fallback_reason, and inputs_as_of in every response
         target: every request for one of the 50 cities gets a forecast; at least 95% of a day's requests are served
           by the model, not counting awaiting_today
@@ -198,7 +199,7 @@ answers:
       tool: Hopsworks jobs with schedules
       settings:
         order:
-          - hourly ingestion and validation
+          - daily ingestion and validation at 12:15 UTC
           - then the feature pipeline; daily label feedback
           - then monitoring; training on drift or by hand
           - then the offline holdout test
@@ -241,7 +242,10 @@ answers:
     entry: The evaluation's go decision (beats persistence by 14.9% on test, meets the V1 bar on CV and test) matches
       the answer action to build the full serving stack.
     ingestion: The draft fetched the last 7 days on each run to catch revisions. The user kept the newest day only,
-      so the assumption that archive values never change stays untested; it is recorded as a risk.
+      so the assumption that archive values never change stays untested; it is recorded as a risk. After the first
+      deploy, the free tier ran out of compute and every hourly run failed from 2026-10-25, so the user moved ingestion
+      to once a day. With one run a day, a feature row one day old is normal, so awaiting_today no longer depends
+      on the local hour, and the cut-off hour that was an open question is gone.
     registry: The skill's rule asked for a margin of at least the champion's CV std (0.236 C). That spread mostly
       reflects how much harder some seasons are, which cancels out when both models are scored on the same days;
       paired gaps between models varied by only 0.03 to 0.05 C across 28 day windows. The user chose a paired one
@@ -298,12 +302,14 @@ answers:
     - problem: When the online feature store cannot be reached, the request fails with HTTP 500, since a KServe
         Python predictor cannot set its own status code.
       resolution: Accepted; monitoring counts predictor errors, and the city level errors cover every other failure.
+    - problem: With one feature run a day, each city serves persistence from its local midnight until 12:15 UTC,
+        about half of each day on average (about 1 hour in Auckland, 12 in London, 21 in Tokyo).
+      resolution: Accepted by the user to save compute; the traffic simulator requests every city between about
+        13:00 and 15:00 UTC, when every city has a fresh row, so the gate and monitoring see the model.
   assumptions:
-    - The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
-  open_questions:
-    - question: How long after local midnight does the hourly feature job write each city's row for tomorrow? The
-        predictor treats a missing row as awaiting_today until 03:00 local, a placeholder until this is measured.
-      stage: system
+    - The Hopsworks free tier is enough for 50 cities, a daily ingestion job, a 6 hourly log job, and an online
+      deployment.
+  open_questions: []
   decisions:
     - decision: Use Hopsworks for the deployed system, including the registry, champion, and challenger; MLflow
         keeps local experiments.
@@ -326,3 +332,6 @@ answers:
       reason: 'The user''s choice while planning the inference pipeline: one place shows which model serves.'
     - decision: Log predictions with the KServe inference logger and a 6 hourly job into the feature group predictions.
       reason: The user chose durability and no logging code in the predictor; a spike confirmed it on Serverless.
+    - decision: Run the feature pipeline once a day at 12:15 UTC; a feature row one day old serves persistence as
+        awaiting_today at any hour.
+      reason: The free tier ran out of compute with hourly runs; the user chose once a day.
