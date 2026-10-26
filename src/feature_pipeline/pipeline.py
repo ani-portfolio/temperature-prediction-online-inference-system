@@ -1,4 +1,5 @@
-"""The feature pipeline's two jobs: a one time backfill, and the hourly run that adds each city's newest days."""
+"""The feature pipeline's two jobs: a one time backfill, and the scheduled run (daily) that adds each city's
+newest days."""
 
 from __future__ import annotations
 
@@ -90,7 +91,7 @@ def backfill(start: date, end: date | None = None, raw_csv: Path | None = None, 
 
 @dataclass
 class CityWork:
-    """What one hourly run does for one city: fetch days fetch_from..fetch_to (None: nothing to fetch), then
+    """What one scheduled run does for one city: fetch days fetch_from..fetch_to (None: nothing to fetch), then
     rebuild its feature rows for target dates rebuild_from..rebuild_to (rebuild_from None: from its first day)."""
     city: str
     fetch_from: date | None
@@ -126,7 +127,7 @@ def plan_work(daily_newest: dict[str, date], features_newest: dict[str, date], z
 
 
 def run_latest(now: datetime | None = None, config: dict | None = None) -> FeatureRunReport:
-    """The hourly job: for each city, fetch the days after its newest stored day up to its last complete local
+    """The scheduled job (daily, named feature_pipeline_hourly): for each city, fetch the days after its newest stored day up to its last complete local
     day, and rebuild the feature rows those days change, plus any rows an earlier run failed to write (plan_work)."""
     config = config or load_config(root=platform.ROOT)
     now = now or datetime.now(UTC)

@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-23T14:59:28'
+  updated: '2026-10-26T15:04:08'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2034,14 +2034,15 @@ system:
       needed: true
       tool: Hopsworks job (Python) writing to the feature group weather_daily
       settings:
-        frequency: hourly
+        frequency: daily
+        time: 12:15 UTC, when every city has passed local midnight (the job keeps the name feature_pipeline_hourly)
         source: Open-Meteo archive API, all 50 cities in one batched request per run
         limits: Open-Meteo free tier (non commercial; per minute, hourly, and daily request caps), one request per
           run
         fetch: the newest day only
         feature_group: weather_daily (primary key city, event time date)
-      reason: The 50 cities close their local day at different UTC hours, so an hourly run keeps each city's last
-        complete day available soon after it ends, for requests that arrive at any time.
+      reason: One run a day at 12:15 UTC writes a fresh row for tomorrow in every city, since all 50 have passed
+        local midnight by then; each row stays fresh until that city's next local midnight.
     data_validation:
       needed: true
       tool: Great Expectations suite attached to weather_daily (strict ingestion policy)
@@ -2200,8 +2201,8 @@ system:
       settings:
         fallback: persistence from the newest complete day when inputs are stale by up to 3 days, when the model
           fails, or when no model is tagged champion; the seasonal naive (the maximum 364 days before tomorrow)
-          when inputs are more than 3 days old; just after local midnight, before the feature job has written tomorrow's
-          row, persistence with the reason awaiting_today
+          when inputs are more than 3 days old; from local midnight until the next daily feature run writes tomorrow's
+          row (inputs one day old), persistence with the reason awaiting_today; two or three days old is stale
         flags: fallback_used, fallback_reason, and inputs_as_of in every response
         target: every request for one of the 50 cities gets a forecast; at least 95% of a day's requests are served
           by the model, not counting awaiting_today
@@ -2212,7 +2213,7 @@ system:
       tool: Hopsworks jobs with schedules
       settings:
         order:
-          - hourly ingestion and validation
+          - daily ingestion and validation at 12:15 UTC
           - then the feature pipeline; daily label feedback
           - then monitoring; training on drift or by hand
           - then the offline holdout test
@@ -2281,9 +2282,13 @@ system:
     - problem: When the online feature store cannot be reached, the request fails with HTTP 500, since a KServe
         Python predictor cannot set its own status code.
       resolution: Accepted; monitoring counts predictor errors, and the city level errors cover every other failure.
+    - problem: With one feature run a day, each city serves persistence from its local midnight until 12:15 UTC,
+        about half of each day on average (about 1 hour in Auckland, 12 in London, 21 in Tokyo).
+      resolution: Accepted by the user to save compute; the traffic simulator requests every city between about
+        13:00 and 15:00 UTC, when every city has a fresh row, so the gate and monitoring see the model.
   doc: docs/system_design.md
-  run_at: '2026-10-23T14:59:27'
-  doc_hash: cb6a8297a234df08
+  run_at: '2026-10-26T15:04:08'
+  doc_hash: e81eacdc8f9e127e
 iterations:
   current: null
   entries:
@@ -2417,6 +2422,7 @@ assumptions:
   - The forecast is for the next calendar day only (one day after the request, two days after the last complete
     day), for the daily maximum temperature at 2 m.
   - The Hopsworks free tier is enough for 50 cities, an hourly ingestion job, and an online deployment.
+  - The Hopsworks free tier is enough for 50 cities, a daily ingestion job, a 6 hourly log job, and an online deployment.
 open_questions:
   - id: Q1
     question: What does the system serve when the last complete day is not yet in the archive (stale inputs)?
@@ -2568,6 +2574,11 @@ decisions:
     stage: system
     decision: Log predictions with the KServe inference logger and a 6 hourly job into the feature group predictions.
     reason: The user chose durability and no logging code in the predictor; a spike confirmed it on Serverless.
+  - date: '2026-10-26'
+    stage: system
+    decision: Run the feature pipeline once a day at 12:15 UTC; a feature row one day old serves persistence as
+      awaiting_today at any hour.
+    reason: The free tier ran out of compute with hourly runs; the user chose once a day.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2828,6 +2839,12 @@ history:
     skill: ml-system-design
     action: wrote system from its notebook
   - at: '2026-10-23T14:59:28'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-26T15:04:08'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-26T15:04:08'
     skill: ml-system-design
     action: wrote docs/system_design.md
 version:

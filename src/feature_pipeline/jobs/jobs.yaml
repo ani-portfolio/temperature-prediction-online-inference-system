@@ -1,9 +1,11 @@
 # The Hopsworks jobs of the feature pipeline, applied by `python -m deploy.apply` on every merge to main.
 # backfill.py has no job: it reads data/raw, which is not in git, so it runs locally.
+# The job runs once a day to save compute on the free tier; it keeps its old name, since apply never deletes a job and
+# a renamed one would leave the old schedule running.
 jobs:
   feature_pipeline_hourly:
     script: hourly.py            # relative to this jobs/ folder
     args: ""
-    schedule: "0 15 * * * ?"     # Quartz cron in UTC: 15 minutes past every hour
+    schedule: "0 15 12 * * ?"    # Quartz cron in UTC: daily at 12:15, when every city has passed local midnight
     memory_mb: 2048
     cores: 1

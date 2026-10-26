@@ -83,14 +83,17 @@ def test_no_champion_serves_persistence_and_still_runs_shadows():
     assert r["log"]["shadows"] == [{"model_version": 4, "prediction": 19.0}]
 
 
-def test_just_after_midnight_the_missing_row_is_awaited_not_stale():
+@pytest.mark.parametrize("now", [AFTER_MIDNIGHT, NOON])
+def test_a_row_one_day_old_is_awaited_at_any_hour(now):
+    # the feature job runs once a day, so until it does, tomorrow's row is missing in every city
     rows = {date(2026, 10, 24): row(date(2026, 10, 24), 16.0)}
-    r = forecast("Auckland", AFTER_MIDNIGHT, rows, models(), "req-1")
-    assert (r["forecast_max_c"], r["fallback_reason"], r["inputs_as_of"]) == (16.0, "awaiting_today", "2026-10-22")
+    r = forecast("Auckland", now, rows, models(), "req-1")
+    assert (r["forecast_max_c"], r["model_version"], r["fallback_reason"], r["inputs_as_of"]) == (
+        16.0, "persistence", "awaiting_today", "2026-10-22")
 
 
-@pytest.mark.parametrize("days_old", [1, 2, 3])
-def test_a_row_up_to_three_days_old_serves_persistence(days_old):
+@pytest.mark.parametrize("days_old", [2, 3])
+def test_a_row_two_or_three_days_old_is_stale(days_old):
     newest = date.fromordinal(TOMORROW.toordinal() - days_old)
     r = forecast("Auckland", NOON, {newest: row(newest, 15.0)}, models(), "req-1")
     assert (r["forecast_max_c"], r["model_version"], r["fallback_reason"]) == (15.0, "persistence", "stale")
@@ -108,7 +111,7 @@ def test_older_inputs_serve_the_seasonal_naive():
 def test_a_row_without_the_last_day_maximum_does_not_count():
     rows = {TOMORROW: row(TOMORROW, None), date(2026, 10, 24): row(date(2026, 10, 24), 16.0)}
     r = forecast("Auckland", NOON, rows, models(), "req-1")
-    assert (r["forecast_max_c"], r["fallback_reason"]) == (16.0, "stale")
+    assert (r["forecast_max_c"], r["fallback_reason"]) == (16.0, "awaiting_today")
 
 
 def test_nothing_to_serve_is_an_error():

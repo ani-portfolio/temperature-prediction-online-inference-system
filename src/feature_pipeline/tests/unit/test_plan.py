@@ -1,4 +1,4 @@
-"""What the hourly run does for each city: fetch the days weather_daily lacks, and rebuild the feature rows that
+"""What the scheduled run does for each city: fetch the days weather_daily lacks, and rebuild the feature rows that
 weather_features lacks, so a run that wrote the days but not the features heals on the next run."""
 
 from datetime import UTC, date, datetime, timedelta

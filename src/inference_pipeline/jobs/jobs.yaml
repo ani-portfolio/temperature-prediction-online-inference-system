@@ -4,7 +4,7 @@ jobs:
   inference_pipeline_log:
     script: log.py               # relative to this jobs/ folder
     args: ""
-    schedule: "0 30 */6 * * ?"   # Quartz cron in UTC: every 6 hours at :30, clear of the hourly feature job at :15
+    schedule: "0 30 */6 * * ?"   # Quartz cron in UTC: every 6 hours at :30, clear of the daily feature job at 12:15
     memory_mb: 2048
     cores: 1
 deployment:

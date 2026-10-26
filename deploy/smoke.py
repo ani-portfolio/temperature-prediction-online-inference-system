@@ -1,6 +1,6 @@
 """Check a deploy works in prod: python -m deploy.smoke
 
-Runs the hourly feature job once (an upsert of the newest days, so an extra run is harmless) and, once the
+Runs the feature job (feature_pipeline_hourly, scheduled daily) once (an upsert of the newest days, so an extra run is harmless) and, once the
 inference pipeline has a deployment, asks it for one city's forecast and checks the response contract from the
 system design. Exits 1 on any problem."""
 

@@ -23,7 +23,7 @@ How code reaches the Hopsworks project `weather_online_inference`, and how to ro
 It never deletes a job (a job in the clone with no settings is reported as `unmanaged`; delete it by hand) and never
 decides which model serves: the predictor serves the model tagged champion, so promotion stays by hand.
 
-`deploy.smoke` runs the hourly feature job and, once there is a deployment, checks one forecast against the
+`deploy.smoke` runs the feature job (`feature_pipeline_hourly`, scheduled daily at 12:15 UTC) and, once there is a deployment, checks one forecast against the
 contract in `docs/system_design.md`.
 
 ## Adding a job
