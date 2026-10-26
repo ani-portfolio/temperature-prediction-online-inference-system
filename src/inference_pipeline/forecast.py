@@ -5,7 +5,9 @@ A feature row for target date T holds inputs up to T minus 2 days, and its tempe
 on T minus 2, which is persistence. The newest row with that value decides the path:
 
   the row for tomorrow                  the champion; persistence when it fails (model_error) or there is none
-  1 to 3 days older                     persistence from that row: awaiting_today just after local midnight, else stale
+  1 day older                           persistence from that row (awaiting_today): the feature job runs once a day,
+                                        so tomorrow's row is missing from local midnight until its next run
+  2 or 3 days older                     persistence from that row (stale): a daily run was missed
   none of them                          the seasonal naive: the maximum 364 days before tomorrow, the same lag as the
                                         features, read as the lag_2d of the row for tomorrow minus 362 days
 """
@@ -28,8 +30,6 @@ PERSISTENCE = "temperature_2m_max_lag_2d"
 HORIZON_DAYS = 2              # a row for T uses data up to T minus 2 (min_shift_days in ml_spec.yaml)
 STALE_DAYS = 3                # rows older than this serve the seasonal naive instead of persistence
 SEASONAL_ROW_DAYS = 362       # that row's lag_2d is the maximum 364 days before tomorrow
-AWAITING_UNTIL_HOUR = 3       # local hour until which a missing row for tomorrow is awaited, not stale
-                              # (a placeholder: set it from how late the hourly feature job lands each city's day)
 
 
 @dataclass
@@ -87,8 +87,7 @@ def forecast(city: str, now: datetime, rows: dict[date, dict], models: ServingSe
             continue
         as_of = day - timedelta(days=HORIZON_DAYS)
         if k:
-            awaiting = k == 1 and _local_now(city, now).hour < AWAITING_UNTIL_HOUR
-            return response(persistence, "persistence", "awaiting_today" if awaiting else "stale", as_of, day,
+            return response(persistence, "persistence", "awaiting_today" if k == 1 else "stale", as_of, day,
                             persistence)
         shadows = [{"model_version": m.version, "prediction": _predict(m, rows[day])} for m in models.shadows]
         if models.champion is None:
