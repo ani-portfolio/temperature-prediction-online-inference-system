@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-26T15:04:08'
+saved_at: '2026-10-27T13:47:26'
 command:
   - design.py
-  - /private/tmp/claude-501/-Users-ani-Projects-16-weather-prediction/c5016d0e-eaee-4596-90d8-d9d8de1e7ce9/scratchpad/system_answers.yaml
+  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_ua8l9me1.yaml
 answers:
   status: confirmed
   platform:
@@ -215,7 +215,7 @@ answers:
           it, records Resources/deploy/state.json), then deploy.smoke; PRs get a dry run of the deploy; tag changes
           (promotion, rollback, a new challenger) take effect when the deployment restarts, which the owner does
           by hand'
-        host: Hopsworks Serverless (eu-west), project weather_online_inference
+        host: Hopsworks Serverless (eu-west), project online_inference_v2
       reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed. Jobs, schedules,
         and code reach Hopsworks only through a merge to main, so prod always runs a commit that passed CI.
     testing:
@@ -325,7 +325,7 @@ answers:
         GitHub Actions; jobs are set in each pipeline''s jobs/jobs.yaml.'
       reason: The user chose it while planning the deployment; see docs/deployment.md.
     - decision: No component tests and no Hopsworks test project; the system runs on Hopsworks Serverless (eu-west)
-        in the project weather_online_inference.
+        in the project online_inference_v2.
       reason: 'The user''s answer to Q5: CI runs unit tests only, including the skew test on a fixture.'
     - decision: The lifecycle_status tags decide the champion and the shadows (challengers, and former champions
         tagged retiring for 28 days); the predictor reads them at startup, and the owner restarts it by hand.
