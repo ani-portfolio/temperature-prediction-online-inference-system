@@ -6,10 +6,22 @@ import sys
 import zipfile
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from deploy import Change, JobState, changes, contract_problems, desired_state, load_settings, runtime_requirements
+from deploy import (
+    Change,
+    DeployReport,
+    JobState,
+    changes,
+    contract_problems,
+    desired_state,
+    load_settings,
+    runtime_requirements,
+    smoke,
+)
+from deploy.apply import _sync_deployment
 from deploy.settings import (
     INFERENCE_ENVIRONMENT,
     Deployment,
@@ -147,6 +159,11 @@ def test_a_response_that_breaks_the_contract_names_the_field(change, message):
     assert any(message in p for p in contract_problems({**GOOD, **change}, "Auckland"))
 
 
+def test_the_persistence_fallback_before_a_champion_keeps_the_contract():
+    response = {**GOOD, "fallback_used": True, "fallback_reason": "no_champion"}
+    assert contract_problems(response, "Auckland") == []
+
+
 def test_a_response_missing_a_field_names_it():
     response = {k: v for k, v in GOOD.items() if k != "inputs_as_of"}
     assert any("inputs_as_of" in p for p in contract_problems(response, "Auckland"))
@@ -183,6 +200,29 @@ def test_a_deployment_that_differs_is_updated_with_what_differs():
     change = deployment_changes(DEPLOYMENT.name, want, have)
     assert change.action == "update"
     assert all(f in change.detail for f in ("script_file", "environment", "logging"))
+
+
+def empty_project(deployment=None):
+    """A Hopsworks project with no registered model, and the given deployment (none by default)."""
+    def refuse(*args, **kwargs):
+        raise AssertionError("nothing may be created or run")
+    serving = SimpleNamespace(get_deployment=lambda name: deployment, create_predictor=refuse)
+    return SimpleNamespace(get_model_serving=lambda: serving,
+                           get_model_registry=lambda: SimpleNamespace(get_models=lambda name: []),
+                           get_job_api=refuse)
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_with_no_model_registered_the_deployment_is_skipped_not_a_problem(dry_run):
+    report = DeployReport("abc", dry_run)
+    _sync_deployment(empty_project(), load_settings(ROOT), report)
+    assert report.problems == []
+    assert report.deployment.action == "skip" and platform.MODEL in report.deployment.detail
+
+
+def test_before_the_bootstrap_the_smoke_check_passes_without_running_the_job(capsys):
+    assert smoke(empty_project()) == []
+    assert "bootstrap pending" in capsys.readouterr().out
 
 
 def test_the_src_zip_holds_the_code_without_tests_and_imports(tmp_path):

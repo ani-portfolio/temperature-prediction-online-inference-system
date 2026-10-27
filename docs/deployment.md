@@ -1,6 +1,6 @@
 # Deployment
 
-How code reaches the Hopsworks project `weather_online_inference`, and how to roll it back.
+How code reaches the Hopsworks project `online_inference_v2`, how a new project is started, and how to roll back.
 
 ## How a change goes live
 1. Work on a branch (`ml/v1`, ...) and open a PR into `main`.
@@ -17,14 +17,31 @@ How code reaches the Hopsworks project `weather_online_inference`, and how to ro
 * `src/` (without tests) is uploaded as `Resources/deploy/src.zip`, which the predictor imports from;
 * every job in `src/*/jobs/jobs.yaml` is created or updated, with its schedule;
 * the deployment `temperatureforecast` is created (linked to the newest registered model version, with inference
-  logging) or updated, then restarted;
+  logging) or updated, then restarted; while no model is registered (a new project) it is skipped, which is not a
+  problem;
 * `Resources/deploy/state.json` records the commit, the lock hash, and the time.
 
 It never deletes a job (a job in the clone with no settings is reported as `unmanaged`; delete it by hand) and never
 decides which model serves: the predictor serves the model tagged champion, so promotion stays by hand.
 
-`deploy.smoke` runs the feature job (`feature_pipeline_hourly`, scheduled daily at 12:15 UTC) and, once there is a deployment, checks one forecast against the
-contract in `docs/system_design.md`.
+`deploy.smoke` runs the feature job (`feature_pipeline_hourly`, scheduled daily at 12:15 UTC) and checks one forecast
+against the contract in `docs/system_design.md`. While there is no deployment it prints `bootstrap pending` and
+passes without running anything. It accepts the persistence fallback while no model is tagged champion
+(`fallback_reason: no_champion`); any other fallback right after the feature run is a problem.
+
+## Starting a new project
+A new Hopsworks project has no data, no model, and no deployment. Fill it once, in this order:
+1. Set `PROJECT` in `src/platform.py`, and the project's API key as in "The API key" below.
+2. Merge to `main`. The deploy creates the jobs and skips the deployment; the smoke check says `bootstrap pending`.
+   Both pass.
+3. Backfill from your machine, before the feature job's first scheduled run at 12:15 UTC:
+   `.venv/bin/python -m src.feature_pipeline.jobs.backfill`. It upserts, so a rerun is safe.
+4. Run the job `training_pipeline_train` in Hopsworks. It registers a model and starts the gate job, which tags it
+   `challenger` (it beat persistence) or `rejected`.
+5. If it is `challenger`, tag it champion (step 1 of "Promoting a model"; there is no previous champion to retire).
+   If it is `rejected`, leave it: the deployment serves persistence while you find out why.
+6. Actions, deploy, Run workflow. This deploy creates the deployment and starts it; the smoke check now asks it for
+   a forecast. With a champion it serves the model; without one, persistence (`serving persistence` in the log).
 
 ## Adding a job
 Add it to the pipeline's `jobs/jobs.yaml` (`script`, and optionally `args`, `schedule` as a Quartz cron in UTC,

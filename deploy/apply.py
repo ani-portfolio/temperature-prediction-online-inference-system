@@ -181,9 +181,9 @@ def _sync_deployment(project, settings, report):
     report.deployment = change
     if change.action == "create":
         models = project.get_model_registry().get_models(conf.model) or []
-        if not models:
-            report.problems.append(f"deployment {conf.name}: no version of {conf.model} is registered; run the "
-                                   f"train job once first")
+        if not models:   # a new project before its bootstrap: expected, so not a problem
+            report.deployment = Change("skip", conf.name, f"no version of {conf.model} is registered yet, see "
+                                                          f"'Starting a new project' in docs/deployment.md")
             return
         if report.dry_run:
             return

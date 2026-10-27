@@ -69,7 +69,7 @@ class DeploymentState:
 
 @dataclass(frozen=True)
 class Change:
-    action: str               # create, update, same, or unmanaged (in the clone but in no settings file)
+    action: str               # create, update, same, unmanaged (in the clone but in no settings file), or skip
     job: str                  # the job's name, or the deployment's
     detail: str = ""
 
