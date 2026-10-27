@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-PROJECT = "weather_online_inference"
+PROJECT = "online_inference_v2"
 ROOT = Path(__file__).resolve().parents[1]
 
 WEATHER_DAILY = ("weather_daily", 1)          # raw daily weather per city and local date
