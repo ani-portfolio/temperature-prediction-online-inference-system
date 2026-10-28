@@ -1,0 +1,33 @@
+# Simulated traffic for the deployed predictor: every hour, 0 to 10 requests for random cities at random times, so
+# the live gate and monitoring have predictions to score. Runs on GitHub, not Hopsworks, because each run waits most
+# of the hour and Hopsworks compute is billed while a job waits. Scheduled runs can start late or be skipped, and
+# GitHub turns the schedule off after 60 days without a commit to the repository.
+name: simulate
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Plan the same hour again (default random)
+        required: false
+
+concurrency:
+  group: simulate
+  cancel-in-progress: false
+
+jobs:
+  traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - name: One hour of traffic
+        run: uv run --frozen python -m src.inference_pipeline.jobs.simulate ${{ inputs.seed && format('--seed {0}', inputs.seed) || '' }}

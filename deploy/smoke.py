@@ -11,7 +11,7 @@ import sys
 
 from deploy.settings import load_settings
 from src import platform
-from src.inference_pipeline.forecast import CONTRACT
+from src.inference_pipeline import forecast
 
 SMOKE_JOB = "feature_pipeline_hourly"
 PRESENT_JOBS = ("monitoring_pipeline_daily",)   # checked to exist, not run: a run reads and writes every report
@@ -20,14 +20,9 @@ NO_CHAMPION = "no_champion"   # the predictor serves persistence until a model i
 
 
 def contract_problems(response: dict, city: str) -> list[str]:
-    """What breaks the serving contract in one prediction, or nothing. Persistence before there is a champion is a
-    fallback the contract allows."""
-    out = [f"{key} is missing" for key in CONTRACT if key not in response]
-    if "city" in response and response["city"] != city:
-        out.append(f"city is {response['city']!r}, not {city!r}")
-    forecast = response.get("forecast_max_c")
-    if not isinstance(forecast, (int, float)) or not -90 <= forecast <= 60:
-        out.append(f"forecast_max_c {forecast!r} is not a temperature between -90 and 60 C")
+    """What breaks the serving contract in one prediction, or nothing. Stricter than the contract itself: right after
+    a fresh feature run the only fallback allowed is persistence before there is a champion."""
+    out = forecast.contract_problems(response, city)
     if response.get("fallback_used") and response.get("fallback_reason") != NO_CHAMPION:
         out.append(f"fallback_used is true ({response.get('fallback_reason')}) right after a fresh feature run")
     return out
