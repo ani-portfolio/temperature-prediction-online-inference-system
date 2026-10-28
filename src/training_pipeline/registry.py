@@ -16,7 +16,7 @@ import joblib
 import pandas as pd
 
 from src import platform
-from src.registry import MODEL_FILE, STATUS_TAG, champion, load, record
+from src.registry import MODEL_FILE, REFERENCE_FILE, STATUS_TAG, champion, load, record
 from src.training_pipeline.window import TrainingWindow
 
 __all__ = ["Split", "champion", "feature_view", "load", "newest_labelled", "read_holdout", "read_split", "record",
@@ -71,17 +71,21 @@ def read_holdout(fv, training_dataset_version: int, window: TrainingWindow, labe
     return _keep(X_ho, y_ho, window.holdout_start, window.holdout_end, label)
 
 
-def register(project, fv, model, split: Split, window: TrainingWindow, lineage: dict) -> int:
-    """Save the fitted pipeline as a new version of the model, linked to the feature view and the training dataset
-    version, with the status candidate. Returns the version."""
+def register(project, fv, model, split: Split, window: TrainingWindow, lineage: dict,
+             reference: pd.DataFrame) -> int:
+    """Save the fitted pipeline and its reference predictions as a new version of the model, linked to the feature
+    view and the training dataset version, with the status candidate. Returns the version."""
     with tempfile.TemporaryDirectory() as tmp:
         joblib.dump(model, Path(tmp) / MODEL_FILE)
+        reference.to_parquet(Path(tmp) / REFERENCE_FILE, index=False)
         hs_model = project.get_model_registry().python.create_model(
             name=platform.MODEL, feature_view=fv, training_dataset_version=split.training_dataset_version,
             description=f"LightGBM trained to {window.cutoff} on {len(split.X_train)} rows, by the training pipeline")
         hs_model.save(tmp)
+    days = pd.to_datetime(reference["target_date"]).dt.date
     record = {"status": "candidate", "window": {k: v.isoformat() for k, v in asdict(window).items()},
-              "lineage": lineage}
+              "lineage": lineage,
+              "reference": {"start": days.min().isoformat(), "end": days.max().isoformat(), "kind": "oof_last_year"}}
     hs_model.add_tag(STATUS_TAG, json.dumps(record))
     return hs_model.version
 

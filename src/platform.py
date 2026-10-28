@@ -18,6 +18,9 @@ FEATURE_VIEW = ("temperature_max_forecast", 1)
 MODEL = "temperature_max_forecast"
 DEPLOYMENT = "temperatureforecast"            # KServe deployment names are letters and digits only
 PREDICTIONS = ("predictions", 1)              # every model's prediction per answered request, from the log job
+SCORED_PREDICTIONS = ("scored_predictions", 1)  # model predictions joined to the actuals, by the monitoring job
+GATE_REPORTS = ("gate_reports", 1)            # each shadow model against the champion on live days, per day
+MONITORING_REPORTS = ("monitoring_reports", 1)  # drift, live performance, and the model-served share, per day
 
 
 def api_key() -> str | None:

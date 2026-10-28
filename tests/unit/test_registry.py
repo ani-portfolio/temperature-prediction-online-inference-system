@@ -69,3 +69,37 @@ def test_no_champion_still_has_shadows():
     serving = serving_models(FakeRegistry(FakeModel(1, {"status": "challenger"})), TODAY)
     assert serving.champion is None
     assert versions(serving.shadows) == [1]
+
+
+class SavedModel(FakeModel):
+    """A model whose files download to a folder, and whose tag can be written."""
+
+    def __init__(self, version, tag, folder):
+        super().__init__(version, tag)
+        self.folder = folder
+
+    def download(self):
+        return str(self.folder)
+
+    def add_tag(self, name, value):
+        self._tags[name] = value
+
+
+def test_load_reference_reads_the_saved_file_or_none(tmp_path):
+    import pandas as pd
+
+    from src.registry import REFERENCE_FILE, load_reference
+
+    assert load_reference(SavedModel(1, "champion", tmp_path)) is None
+    pd.DataFrame({"city": ["London"], "target_date": [pd.Timestamp("2026-01-01")], "prediction": [8.0]}).to_parquet(
+        tmp_path / REFERENCE_FILE)
+    assert load_reference(SavedModel(1, "champion", tmp_path))["prediction"].tolist() == [8.0]
+
+
+def test_set_live_keeps_the_rest_of_the_tag(tmp_path):
+    from src.registry import set_live
+
+    model = SavedModel(2, {"status": "challenger", "gate": {"p_one_sided": 0.01}}, tmp_path)
+    set_live(model, {"p_one_sided": 0.2, "days": 10})
+    assert record(model) == {"status": "challenger", "gate": {"p_one_sided": 0.01},
+                             "live": {"p_one_sided": 0.2, "days": 10}}

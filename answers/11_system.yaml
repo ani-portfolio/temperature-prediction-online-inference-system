@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-27T13:47:26'
+saved_at: '2026-10-28T13:42:36'
 command:
   - design.py
-  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_ua8l9me1.yaml
+  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_iqp8byam.yaml
 answers:
   status: confirmed
   platform:
@@ -91,13 +91,15 @@ answers:
       needed: true
       tool: Hopsworks job creating training data from the feature view
       settings:
-        trigger: on drift (from monitoring) or by hand
+        trigger: by hand, after the owner reads the monitoring reports (drift alone may not need a refit)
         window: expanding, from 2024-01-01 to the last labelled day minus the 28 day holdout
         refit: LightGBM with the champion's tuned settings, no retuning (retuning and new features stay in /ml-iterate)
         output: a candidate model in the Hopsworks registry; it becomes the challenger only if it passes the offline
           holdout test
-      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; a refit is started
-        when monitoring flags drift or by hand.
+        reference: out-of-fold predictions for the last 364 training days, from a second fit on the days before
+          them, saved with the model as reference.parquet for the prediction drift check
+      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; the owner starts
+        a refit after reading the monitoring reports.
     registry:
       needed: true
       tool: Hopsworks model registry
@@ -165,22 +167,34 @@ answers:
       settings:
         label_arrives: the day after the target date (1 day label delay)
         join: city and target date
-        output: city, target date, model version, served or shadow, prediction, actual, absolute error
+        source: the actual maximum from weather_daily
+        output: city, target date, model version, served or shadow, prediction, actual, absolute error, persistence_c
+          and its absolute error; model rows only (fallback rows stay in predictions); the first row per city, target
+          date, and model
+        live_gate: every shadow model (challengers and retiring) against the champion on the city-days both scored,
+          after both training cutoffs, one sided Diebold-Mariano from 14 shared days; written to the feature group
+          gate_reports and copied to the model's tag as its live block
       reason: The gate's test and monitoring read only this table, so the join is done once.
     monitoring:
       needed: true
-      tool: Hopsworks feature monitoring plus Evidently, as a daily job after label feedback
+      tool: Own PSI (src.drift, the evaluation's formula) in one daily Hopsworks job, monitoring_pipeline_daily
+        at 13:30 UTC, after label feedback and the live gate
       settings:
-        data_drift: PSI of each input against the same calendar month in training; alert above 0.25
-        prediction_drift: PSI of the predictions against the same calendar month in training; alert above 0.25
+        data_drift: PSI of each input over the last 28 days, all 50 cities from weather_features, against the same
+          calendar days in the champion's training data; flag above 0.25
+        prediction_drift: PSI of the champion's live predictions over the last 28 days against its reference predictions
+          on the same calendar days, for the cities seen live; flag above 0.25
         performance: the served model's rolling 28 day live MAE against persistence on the same city-days; alert
           when the reverse one sided Diebold-Mariano test says the model is not better; shown next to the evaluation's
           monthly MAE (1.79 to 2.44 C)
-        system_health: failed jobs, predictor errors and latency, the daily share of requests served by the fallback
-          (alert under 95% model served)
-        alerts: email to the owner
+        system_health: the daily share of served answers from a model, not counting awaiting_today (flag under 95%),
+          and failed jobs through the platform's job failure alerts; predictor errors and latency are not measured
+          yet
+        alerts: none sent by the job; every check is a row in the feature group monitoring_reports with a flag,
+          which the owner reads; the job fails when a step fails, so the platform's job failure email reaches the
+          owner
       reason: The evaluation's PSI (0.31 on predictions, 0.26 on actuals) came from the seasons, so drift is compared
-        month for month.
+        on the same calendar days.
     failure_handling:
       needed: true
       tool: Fallback in the predictor script
@@ -201,7 +215,7 @@ answers:
         order:
           - daily ingestion and validation at 12:15 UTC
           - then the feature pipeline; daily label feedback
-          - then monitoring; training on drift or by hand
+          - then monitoring (label feedback, live gate, checks in one daily job at 13:30 UTC); training by hand
           - then the offline holdout test
         retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
           serving with the fallback
@@ -252,7 +266,9 @@ answers:
       sided Diebold-Mariano test at alpha 0.05 instead, with manual promotion and no fixed window, and the skill
       was changed to allow a test in place of a margin. The frozen test set cannot serve as the entry check, because
       a refit trains on it and it has been opened 3 times, so a recent 28 day holdout is used.
-    training: The user chose refits on drift or by hand over a monthly schedule.
+    training: The user chose refits by hand over a monthly schedule. While planning the monitoring pipeline, the
+      user dropped the automatic trigger on drift, to understand an alert first (drift with good performance may
+      not need a refit), and had training save out-of-fold reference predictions for the last year.
     inference: Only requested cities are scored, so the gate's live comparison depends on traffic; this is recorded
       as a risk. While planning the build, the user chose the registry tags over the deployment's model version
       to decide the champion, so the registry alone shows which model serves, and chose to read them only at startup
@@ -261,7 +277,10 @@ answers:
     serving: The user chose prod only; the draft had dev and prod. The user later chose to use their personal API
       key for CI. Rollback is now a tag change and a restart rather than a version switch, which follows from the
       tags deciding the champion. Errors are per city so one bad city does not fail a batch request.
-    monitoring: The user dropped the weekly archive revision check.
+    monitoring: The user dropped the weekly archive revision check. While planning the monitoring pipeline, the
+      user chose an own PSI function over Evidently and Hopsworks feature monitoring (cheaper on the free tier,
+      testable, and the same formula as the evaluation), a rolling 28 day window, reports read by the owner instead
+      of email, and one daily job.
     failure_handling: The user changed the draft so the seasonal naive takes over after 3 days instead of an error
       after 7, so every request gets a forecast. While planning the build, the user added persistence when no model
       is tagged champion, and the awaiting_today reason so the short gap after local midnight does not count against

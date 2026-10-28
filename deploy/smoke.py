@@ -1,7 +1,7 @@
 """Check a deploy works in prod: python -m deploy.smoke
 
 Runs the feature job (feature_pipeline_hourly, scheduled daily) once (an upsert of the newest days, so an extra run is
-harmless) and asks the deployment for one city's forecast, checking the response contract from the system design.
+harmless), checks the monitoring job exists, and asks the deployment for one city's forecast, checking the response contract from the system design.
 Before a new project's bootstrap there is no deployment and no data, so it only says so and passes; see 'Starting a
 new project' in docs/deployment.md. Exits 1 on any problem."""
 
@@ -14,6 +14,7 @@ from src import platform
 from src.inference_pipeline.forecast import CONTRACT
 
 SMOKE_JOB = "feature_pipeline_hourly"
+PRESENT_JOBS = ("monitoring_pipeline_daily",)   # checked to exist, not run: a run reads and writes every report
 SMOKE_CITY = "Auckland"
 NO_CHAMPION = "no_champion"   # the predictor serves persistence until a model is tagged champion
 
@@ -44,6 +45,13 @@ def smoke(project=None) -> list[str]:
                   f"in docs/deployment.md")
             return []
     problems = []
+    for name in PRESENT_JOBS:
+        try:
+            found = project.get_job_api().get_job(name)
+        except Exception:   # noqa: BLE001 - the client raises for a missing job; either way it is a problem
+            found = None
+        if found is None:
+            problems.append(f"job {name} does not exist")
     execution = project.get_job_api().get_job(SMOKE_JOB).run(await_termination=True)
     if execution.final_status != "SUCCEEDED":
         problems.append(f"job {SMOKE_JOB} ended {execution.final_status}")
