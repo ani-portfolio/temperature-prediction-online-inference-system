@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-28T13:42:36'
+saved_at: '2026-10-28T19:28:19'
 command:
   - design.py
-  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_iqp8byam.yaml
+  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_leyqbnsy.yaml
 answers:
   status: confirmed
   platform:
@@ -300,8 +300,11 @@ answers:
       resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
     - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
         may take months to reach significance.
-      resolution: The owner runs a separate service that requests forecasts to mimic traffic; it should cover every
-        city every day, after the gap after local midnight.
+      resolution: A traffic simulator (.github/workflows/simulate.yml, hourly on GitHub Actions) sends 0 to 10 single-city
+        requests an hour for random cities at random times, about 120 a day; about half reach the model and the
+        rest fall in a city's awaiting_today gap, so roughly 30 to 40 cities a day are scored and the test takes
+        longer than it would with every city every day. The user chose random traffic over full daily coverage to
+        mimic real use while improvements are built and shadowed.
     - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
@@ -323,8 +326,8 @@ answers:
       resolution: Accepted; monitoring counts predictor errors, and the city level errors cover every other failure.
     - problem: With one feature run a day, each city serves persistence from its local midnight until 12:15 UTC,
         about half of each day on average (about 1 hour in Auckland, 12 in London, 21 in Tokyo).
-      resolution: Accepted by the user to save compute; the traffic simulator requests every city between about
-        13:00 and 15:00 UTC, when every city has a fresh row, so the gate and monitoring see the model.
+      resolution: Accepted by the user to save compute; the traffic simulator's random requests fall in this gap
+        about half the time, like real traffic, and the 95% model-served target leaves awaiting_today out.
   assumptions:
     - The Hopsworks free tier is enough for 50 cities, a daily ingestion job, a 6 hourly log job, and an online
       deployment.

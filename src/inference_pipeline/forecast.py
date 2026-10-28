@@ -26,6 +26,7 @@ from src.registry import ServingSet
 
 CONTRACT = ("city", "target_date", "forecast_max_c", "model_version", "fallback_used", "fallback_reason",
             "inputs_as_of")
+FALLBACK_REASONS = ("model_error", "stale", "awaiting_today", "seasonal", "no_champion")
 PERSISTENCE = "temperature_2m_max_lag_2d"
 HORIZON_DAYS = 2              # a row for T uses data up to T minus 2 (min_shift_days in ml_spec.yaml)
 STALE_DAYS = 3                # rows older than this serve the seasonal naive instead of persistence
@@ -103,3 +104,19 @@ def forecast(city: str, now: datetime, rows: dict[date, dict], models: ServingSe
         raise LookupError(f"No feature row gives a forecast for {city} on {tomorrow}.")
     return response(seasonal, "seasonal_naive", "seasonal", seasonal_day - timedelta(days=HORIZON_DAYS),
                     seasonal_day, None)
+
+
+def contract_problems(response: dict, city: str) -> list[str]:
+    """What breaks the serving contract in one answer for city, or nothing. Every fallback the rules above give keeps
+    the contract; a {city, error} answer does not."""
+    if "error" in response:
+        return [f"{city}: {response['error']}"]
+    out = [f"{key} is missing" for key in CONTRACT if key not in response]
+    if "city" in response and response["city"] != city:
+        out.append(f"city is {response['city']!r}, not {city!r}")
+    value = response.get("forecast_max_c")
+    if not isinstance(value, (int, float)) or not -90 <= value <= 60:
+        out.append(f"forecast_max_c {value!r} is not a temperature between -90 and 60 C")
+    if response.get("fallback_used") and response.get("fallback_reason") not in FALLBACK_REASONS:
+        out.append(f"fallback_reason {response.get('fallback_reason')!r} is not one of {', '.join(FALLBACK_REASONS)}")
+    return out
