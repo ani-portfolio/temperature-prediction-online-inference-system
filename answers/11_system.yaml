@@ -220,7 +220,8 @@ answers:
         retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
           serving with the fallback
         deployment: 'Hopsworks Git integration: the public GitHub repo is cloned to Resources/temperature-prediction-online-inference-system;
-          a merge to main (protected: PR and passing checks) runs deploy.yml, which runs the checks, then deploy.apply
+          after a merge to main (protected: PR and passing checks) the owner runs deploy.yml by hand from main; it
+          runs the checks, then deploy.apply
           (checks the clone out at the tested commit, installs the runtime dependency group from uv.lock into the
           environments weather (jobs, cloned from pandas-training-pipeline) and weather-inference (the predictor,
           cloned from pandas-inference-pipeline, since deployments need an inference image) when uv.lock changes,
@@ -231,7 +232,8 @@ answers:
           by hand'
         host: Hopsworks Serverless (eu-west), project online_inference_v2
       reason: Each pipeline is a job; the feature job runs only after ingestion and validation succeed. Jobs, schedules,
-        and code reach Hopsworks only through a merge to main, so prod always runs a commit that passed CI.
+        and code reach Hopsworks only through a deploy run from main, so prod always runs a commit that passed CI.
+        The user made deploys manual so a merge that changes nothing on Hopsworks costs no restart or feature run.
     testing:
       needed: true
       tool: pytest (tests/unit, tests/system) in GitHub Actions
@@ -300,11 +302,11 @@ answers:
       resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
     - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
         may take months to reach significance.
-      resolution: A traffic simulator (.github/workflows/simulate.yml, hourly on GitHub Actions) sends 0 to 10 single-city
-        requests an hour for random cities at random times, about 120 a day; about half reach the model and the
-        rest fall in a city's awaiting_today gap, so roughly 30 to 40 cities a day are scored and the test takes
-        longer than it would with every city every day. The user chose random traffic over full daily coverage to
-        mimic real use while improvements are built and shadowed.
+      resolution: A traffic simulator (.github/workflows/simulate.yml on GitHub Actions) sends 0 to 10 single-city
+        requests in one hour for random cities at random times; about half reach the model and the rest fall in a
+        city's awaiting_today gap. The user chose random traffic over full daily coverage to mimic real use while
+        improvements are built and shadowed, and runs it by hand, one hour per run, so the gate gets data only on
+        days the owner runs it and may still take months.
     - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
@@ -343,7 +345,7 @@ answers:
         difficulty, not the noise of a paired comparison.
     - decision: When inputs are stale, serve persistence for up to 3 days, then the seasonal naive.
       reason: The user's answer to Q1 (serve the baseline), refined so every request gets a forecast.
-    - decision: 'Deploy with Hopsworks Git integration: every merge to main runs deploy.apply and deploy.smoke from
+    - decision: 'Deploy with Hopsworks Git integration: the owner runs deploy.apply and deploy.smoke by hand from
         GitHub Actions; jobs are set in each pipeline''s jobs/jobs.yaml.'
       reason: The user chose it while planning the deployment; see docs/deployment.md.
     - decision: No component tests and no Hopsworks test project; the system runs on Hopsworks Serverless (eu-west)

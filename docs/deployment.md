@@ -6,8 +6,9 @@ How code reaches the Hopsworks project `online_inference_v2`, how a new project 
 1. Work on a branch (`ml/v1`, ...) and open a PR into `main`.
 2. CI (`.github/workflows/ci.yml`) runs `uv sync --locked`, `ruff check`, and `pytest -m unit` on Python 3.11 and
    3.13, then a dry run of the deploy that prints what the merge would change in Hopsworks.
-3. Merging runs `.github/workflows/deploy.yml`: the same checks, then `python -m deploy.apply` and
-   `python -m deploy.smoke` under the GitHub environment `prod`. Deploys run one at a time.
+3. Merge, then run `.github/workflows/deploy.yml` by hand (Actions, deploy, Run workflow, from `main`): the same
+   checks, then `python -m deploy.apply` and `python -m deploy.smoke` under the GitHub environment `prod`. A merge
+   alone deploys nothing. Deploys run one at a time.
 
 `deploy.apply` makes the project run exactly one commit:
 * the clone at `Resources/temperature-prediction-online-inference-system` is checked out at that commit;
@@ -32,7 +33,7 @@ passes without running anything. It accepts the persistence fallback while no mo
 ## Starting a new project
 A new Hopsworks project has no data, no model, and no deployment. Fill it once, in this order:
 1. Set `PROJECT` in `src/platform.py`, and the project's API key as in "The API key" below.
-2. Merge to `main`. The deploy creates the jobs and skips the deployment; the smoke check says `bootstrap pending`.
+2. Merge to `main` and run the deploy workflow. The deploy creates the jobs and skips the deployment; the smoke check says `bootstrap pending`.
    Both pass.
 3. Backfill from your machine, before the feature job's first scheduled run at 12:15 UTC:
    `.venv/bin/python -m src.feature_pipeline.jobs.backfill`. It upserts, so a rerun is safe.

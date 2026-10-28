@@ -1,10 +1,9 @@
-# Deploy main to the Hopsworks project, then check it works. To roll back, revert on main, or run this workflow
-# by hand from the Actions tab with the commit to go back to.
+# Deploy main to the Hopsworks project, then check it works. Runs only by hand (Actions, deploy, Run workflow, from
+# main), so a merge that changes nothing on Hopsworks costs no restart and no feature run. To roll back, revert on
+# main and run it, or run it with the commit to go back to.
 name: deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
