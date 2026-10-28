@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-27T13:47:26'
+  updated: '2026-10-28T13:42:35'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2105,13 +2105,15 @@ system:
       needed: true
       tool: Hopsworks job creating training data from the feature view
       settings:
-        trigger: on drift (from monitoring) or by hand
+        trigger: by hand, after the owner reads the monitoring reports (drift alone may not need a refit)
         window: expanding, from 2024-01-01 to the last labelled day minus the 28 day holdout
         refit: LightGBM with the champion's tuned settings, no retuning (retuning and new features stay in /ml-iterate)
         output: a candidate model in the Hopsworks registry; it becomes the challenger only if it passes the offline
           holdout test
-      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; a refit is started
-        when monitoring flags drift or by hand.
+        reference: out-of-fold predictions for the last 364 training days, from a second fit on the days before
+          them, saved with the model as reference.parquet for the prediction drift check
+      reason: The evaluation found no accuracy decay over 26 weeks, so a schedule buys little; the owner starts
+        a refit after reading the monitoring reports.
     registry:
       needed: true
       tool: Hopsworks model registry
@@ -2179,22 +2181,34 @@ system:
       settings:
         label_arrives: the day after the target date (1 day label delay)
         join: city and target date
-        output: city, target date, model version, served or shadow, prediction, actual, absolute error
+        source: the actual maximum from weather_daily
+        output: city, target date, model version, served or shadow, prediction, actual, absolute error, persistence_c
+          and its absolute error; model rows only (fallback rows stay in predictions); the first row per city, target
+          date, and model
+        live_gate: every shadow model (challengers and retiring) against the champion on the city-days both scored,
+          after both training cutoffs, one sided Diebold-Mariano from 14 shared days; written to the feature group
+          gate_reports and copied to the model's tag as its live block
       reason: The gate's test and monitoring read only this table, so the join is done once.
     monitoring:
       needed: true
-      tool: Hopsworks feature monitoring plus Evidently, as a daily job after label feedback
+      tool: Own PSI (src.drift, the evaluation's formula) in one daily Hopsworks job, monitoring_pipeline_daily
+        at 13:30 UTC, after label feedback and the live gate
       settings:
-        data_drift: PSI of each input against the same calendar month in training; alert above 0.25
-        prediction_drift: PSI of the predictions against the same calendar month in training; alert above 0.25
+        data_drift: PSI of each input over the last 28 days, all 50 cities from weather_features, against the same
+          calendar days in the champion's training data; flag above 0.25
+        prediction_drift: PSI of the champion's live predictions over the last 28 days against its reference predictions
+          on the same calendar days, for the cities seen live; flag above 0.25
         performance: the served model's rolling 28 day live MAE against persistence on the same city-days; alert
           when the reverse one sided Diebold-Mariano test says the model is not better; shown next to the evaluation's
           monthly MAE (1.79 to 2.44 C)
-        system_health: failed jobs, predictor errors and latency, the daily share of requests served by the fallback
-          (alert under 95% model served)
-        alerts: email to the owner
+        system_health: the daily share of served answers from a model, not counting awaiting_today (flag under 95%),
+          and failed jobs through the platform's job failure alerts; predictor errors and latency are not measured
+          yet
+        alerts: none sent by the job; every check is a row in the feature group monitoring_reports with a flag,
+          which the owner reads; the job fails when a step fails, so the platform's job failure email reaches the
+          owner
       reason: The evaluation's PSI (0.31 on predictions, 0.26 on actuals) came from the seasons, so drift is compared
-        month for month.
+        on the same calendar days.
     failure_handling:
       needed: true
       tool: Fallback in the predictor script
@@ -2215,7 +2229,7 @@ system:
         order:
           - daily ingestion and validation at 12:15 UTC
           - then the feature pipeline; daily label feedback
-          - then monitoring; training on drift or by hand
+          - then monitoring (label feedback, live gate, checks in one daily job at 13:30 UTC); training by hand
           - then the offline holdout test
         retries: two retries 10 minutes apart; a job that still fails alerts the owner, and the predictor keeps
           serving with the fallback
@@ -2287,8 +2301,8 @@ system:
       resolution: Accepted by the user to save compute; the traffic simulator requests every city between about
         13:00 and 15:00 UTC, when every city has a fresh row, so the gate and monitoring see the model.
   doc: docs/system_design.md
-  run_at: '2026-10-27T13:47:25'
-  doc_hash: c137212feee21903
+  run_at: '2026-10-28T13:42:35'
+  doc_hash: 8b851f001a02acda
 iterations:
   current: null
   entries:
@@ -2856,6 +2870,12 @@ history:
     skill: ml-system-design
     action: wrote system from its notebook
   - at: '2026-10-27T13:47:26'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-28T13:42:35'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-28T13:42:35'
     skill: ml-system-design
     action: wrote docs/system_design.md
 version:

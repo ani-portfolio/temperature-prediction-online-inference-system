@@ -1,4 +1,5 @@
-"""The train job: refit the champion's recipe on the newest data, register it as a candidate, and start the gate."""
+"""The train job: refit the champion's recipe on the newest data, register it as a candidate with its out-of-fold
+reference predictions, and start the gate."""
 
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from src import platform
 from src.features import load_config
 from src.training_pipeline import registry
 from src.training_pipeline.model import build_model
+from src.training_pipeline.reference import reference_predictions
 from src.training_pipeline.window import training_window
 
 HOLDOUT_DAYS = 28
@@ -54,8 +56,11 @@ def run_training(holdout_days: int = HOLDOUT_DAYS, start_gate: bool = True) -> T
     window = training_window(registry.newest_labelled(fs, label), start, holdout_days)
     fv = registry.feature_view(fs)
     split = registry.read_split(fv, window, label)
-    model = build_model(spec["training"]["champion"]["params"], config).fit(split.X_train, split.y_train)
-    version = registry.register(project, fv, model, split, window, lineage(spec))
+    params = spec["training"]["champion"]["params"]
+    model = build_model(params, config).fit(split.X_train, split.y_train)
+    reference = reference_predictions(lambda: build_model(params, config), split.X_train, split.y_train,
+                                      window.cutoff)
+    version = registry.register(project, fv, model, split, window, lineage(spec), reference)
     if start_gate:
         project.get_job_api().get_job(GATE_JOB).run(args=f"--version {version}", await_termination=False)
     return TrainingReport(version, window.train_start, window.cutoff, window.holdout_start, window.holdout_end,

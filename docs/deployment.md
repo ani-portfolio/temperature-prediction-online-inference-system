@@ -62,6 +62,22 @@ restart (`project.get_model_serving().get_deployment("temperatureforecast")`, th
 
 A new challenger from the gate job is shadowed only after a restart; the gate job prints a reminder.
 
+## Reading the monitoring reports
+The job `monitoring_pipeline_daily` (13:30 UTC) writes three feature groups and sends nothing; read them yourself.
+* `gate_reports`: one row per shadow model per day against the champion on the same live city-days. A challenger
+  with `p_one_sided` under 0.05 supports a promotion; a retiring model with it supports a rollback. The newest row is
+  also in the model's tag, as `live`. The test waits for 14 shared days.
+* `monitoring_reports`: one row per check per day, with `flagged`. `input_psi` and `prediction_psi` compare the last
+  28 days with the same calendar days in training; `performance` is the champion's live MAE, flagged when it is not
+  significantly better than persistence (the note holds persistence's MAE and the evaluation's monthly range);
+  `served_share` is the share of yesterday's answers from a model, flagged under 95%. A flag is a reason to look,
+  not to retrain: start `training_pipeline_train` by hand once you know the cause.
+* `scored_predictions`: every model prediction with its actual, for your own queries.
+
+Turn on the platform's job failure alerts (email) for every job: a failed monitoring step fails the job, and a job
+that stops running leaves old reports that look fine. A model registered before the reference predictions has none,
+so its `prediction_psi` row says `no_reference`.
+
 ## Rolling back
 * A model: tag the bad champion `rejected` (or `retiring` with today's date), tag the previous one `champion`, then
   restart the deployment.

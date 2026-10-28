@@ -1,4 +1,5 @@
-"""Which registered models serve, read from their lifecycle_status tags. Shared by the training and inference pipelines.
+"""Which registered models serve, read from their lifecycle_status tags. Shared by the training, inference, and
+monitoring pipelines.
 
 Each model's state lives in its lifecycle_status tag, a JSON string (the cluster's tag schema is a plain string):
 {"status": "candidate" | "challenger" | "rejected" | "champion" | "retiring", ...}. Promotion is by hand: tag the new
@@ -14,11 +15,13 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import joblib
+import pandas as pd
 
 from src import platform
 
 STATUS_TAG = "lifecycle_status"
 MODEL_FILE = "model.joblib"
+REFERENCE_FILE = "reference.parquet"   # out-of-fold predictions for the last training year, for prediction drift
 RETIRING_DAYS = 28   # a former champion predicts in shadow this long after its replacement is promoted
 
 
@@ -68,3 +71,15 @@ def serving_models(mr, today: date) -> ServingSet:
 def load(model):
     """The fitted pipeline of a registered model."""
     return joblib.load(Path(model.download()) / MODEL_FILE)
+
+
+def load_reference(model) -> pd.DataFrame | None:
+    """The reference predictions saved with a model (city, target_date, prediction), or None for a model saved
+    without them."""
+    path = Path(model.download()) / REFERENCE_FILE
+    return pd.read_parquet(path) if path.exists() else None
+
+
+def set_live(model, live: dict):
+    """Write the live gate result into the model's tag as its live block, keeping every other field."""
+    model.add_tag(STATUS_TAG, json.dumps({**record(model), "live": live}))
