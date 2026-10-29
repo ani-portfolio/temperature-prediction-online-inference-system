@@ -6,7 +6,15 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from src.monitoring_pipeline.checks import CHECK_COLUMNS, drift_rows, performance_row, served_share_row, skipped_rows
+from src.monitoring_pipeline.checks import (
+    CHECK_COLUMNS,
+    IMPLAUSIBLE_C,
+    canary_row,
+    drift_rows,
+    performance_row,
+    served_share_row,
+    skipped_rows,
+)
 
 AS_OF = date(2026, 10, 27)
 RNG = np.random.default_rng(0)
@@ -90,3 +98,63 @@ def test_served_share_leaves_out_awaiting_today_and_flags_under_95_percent():
 def test_skipped_rows_say_why():
     out = skipped_rows(["performance", "prediction_psi"], AS_OF, "no_champion")
     assert out["note"].tolist() == ["no_champion", "no_champion"] and not out["flagged"].any()
+
+
+def answered(city, target_date, arm, served, served_pred, shadows=(), reason=None, at="2026-10-26 10:00",
+             persistence=17.0):
+    """The predictions rows of one answered request: the served row and one per shadow, all with the city-day's arm."""
+    common = {"request_id": f"{city}-{target_date}-{at}", "city": city, "target_date": pd.Timestamp(target_date),
+              "request_time": pd.Timestamp(at, tz="UTC"), "arm": arm, "persistence_c": persistence,
+              "fallback_reason": reason}
+    return [{**common, "model_version": served, "role": "served", "prediction": served_pred},
+            *({**common, "model_version": v, "role": "shadow", "prediction": p} for v, p in shadows)]
+
+
+def canary(rows, since=None):
+    return canary_row(pd.DataFrame([r for req in rows for r in req]), "9", "canary", 0.1, since, AS_OF)
+
+
+def test_a_healthy_candidate_has_no_breaches():
+    r = canary([answered("London", "2026-10-26", "candidate", "9", 18.0, [("3", 17.5)]),
+                answered("Tokyo", "2026-10-26", "candidate", "9", 21.0, [("3", 20.0)]),
+                answered("Lima", "2026-10-26", "champion", "3", 19.0, [("9", 19.5)])])
+    assert (r["candidate_city_days"], r["checked_city_days"], r["breaches"], r["flagged"]) == (2, 3, 0, False)
+    assert (r["model_version"], r["status"], r["traffic"], r["threshold_c"]) == ("9", "canary", 0.1, IMPLAUSIBLE_C)
+
+
+def test_a_forecast_far_from_persistence_is_a_breach_counted_once_per_city_day():
+    far = 17.0 + IMPLAUSIBLE_C + 1
+    r = canary([answered("London", "2026-10-26", "candidate", "9", far, [("3", 17.5)]),
+                answered("London", "2026-10-26", "candidate", "9", far, [("3", 17.5)], at="2026-10-26 11:00"),
+                answered("Lima", "2026-10-26", "champion", "3", 19.0, [("9", -300.0)])])   # Kelvin gone wrong
+    assert (r["implausible"], r["missing"], r["breaches"], r["flagged"]) == (2, 0, 2, True)
+
+
+def test_a_candidate_failing_on_its_own_city_day_is_missing():
+    # the caller got persistence; the candidate has no row of its own
+    r = canary([answered("London", "2026-10-26", "candidate", "persistence", 17.0, [("3", 17.5)],
+                         reason="model_error")])
+    assert (r["candidate_city_days"], r["missing"], r["breaches"], r["flagged"]) == (1, 1, 1, True)
+
+
+def test_a_candidate_failing_in_shadow_is_missing():
+    r = canary([answered("Lima", "2026-10-26", "champion", "3", 19.0, [("9", None)])])
+    assert (r["missing"], r["flagged"]) == (1, True)
+
+
+def test_a_champion_failure_is_not_the_candidate_s_breach():
+    r = canary([answered("Lima", "2026-10-26", "champion", "persistence", 17.0, [("9", 18.0)], reason="model_error")])
+    assert (r["missing"], r["breaches"]) == (0, 0)
+
+
+def test_only_requests_since_the_step_began_count():
+    r = canary([answered("London", "2026-10-20", "candidate", "9", 60.0, at="2026-10-19 10:00"),
+                answered("London", "2026-10-26", "candidate", "9", 18.0)], since=date(2026, 10, 25))
+    assert (r["candidate_city_days"], r["breaches"], r["since"]) == (1, 0, "2026-10-25")
+
+
+def test_no_candidate_rows_is_a_row_with_zeros():
+    r = canary_row(pd.DataFrame(columns=["request_time", "city", "target_date", "model_version", "role", "arm",
+                                         "prediction", "persistence_c", "fallback_reason"]),
+                   "9", "canary", 0.1, None, AS_OF)
+    assert (r["candidate_city_days"], r["checked_city_days"], r["breaches"], r["flagged"]) == (0, 0, 0, False)

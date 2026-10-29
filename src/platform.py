@@ -21,6 +21,7 @@ PREDICTIONS = ("predictions", 1)              # every model's prediction per ans
 SCORED_PREDICTIONS = ("scored_predictions", 1)  # model predictions joined to the actuals, by the monitoring job
 GATE_REPORTS = ("gate_reports", 1)            # each shadow model against the champion on live days, per day
 MONITORING_REPORTS = ("monitoring_reports", 1)  # drift, live performance, and the model-served share, per day
+CANARY_REPORTS = ("canary_reports", 1)        # the canary guardrail for the candidate in canary or ab, per day
 
 
 def api_key() -> str | None:

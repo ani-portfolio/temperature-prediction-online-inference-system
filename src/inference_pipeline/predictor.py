@@ -18,7 +18,9 @@ class Server:
     def __init__(self, project, today: date | None = None, load=registry.load):
         serving = registry.serving_models(project.get_model_registry(), today or datetime.now(UTC).date())
         self.models = ServingSet(serving.champion and Model(serving.champion.version, load(serving.champion)),
-                                 [Model(m.version, load(m)) for m in serving.shadows])
+                                 [Model(m.version, load(m)) for m in serving.shadows],
+                                 serving.candidate and Model(serving.candidate.version, load(serving.candidate)),
+                                 serving.traffic, serving.salt)
         self.fv = project.get_feature_store().get_feature_view(*platform.FEATURE_VIEW)
         self.fv.init_serving()
 

@@ -22,11 +22,12 @@ def message(kind, payload, inference_id="inf-1", code=200, ts=1792779509):
     return out.getvalue()
 
 
-def answer(city="Auckland", request_id="req-1", version=3, reason=None, shadows=()):
+def answer(city="Auckland", request_id="req-1", version=3, reason=None, shadows=(), arm="champion"):
+    log = {"request_id": request_id, "persistence_c": 17.0, "feature_row": "2026-10-25", "shadows": list(shadows)}
+    if arm != "absent":   # answers logged before the rollout have no arm
+        log["arm"] = arm
     return {"city": city, "target_date": "2026-10-25", "forecast_max_c": 18.4, "model_version": version,
-            "fallback_used": reason is not None, "fallback_reason": reason, "inputs_as_of": "2026-10-23",
-            "log": {"request_id": request_id, "persistence_c": 17.0, "feature_row": "2026-10-25",
-                    "shadows": list(shadows)}}
+            "fallback_used": reason is not None, "fallback_reason": reason, "inputs_as_of": "2026-10-23", "log": log}
 
 
 def test_decodes_the_messages_the_spike_captured():
@@ -49,6 +50,31 @@ def test_one_row_for_the_served_model_and_one_per_shadow():
     assert str(first["target_date"].date()) == "2026-10-25"
     assert str(first["request_time"]) == "2026-10-23 18:18:29+00:00"
     assert rows["fallback_used"].tolist() == [False, False, False]
+
+
+def test_the_arm_is_on_every_row_of_the_answer():
+    rows = log_rows([message("response", {"predictions": [answer(version=9, arm="candidate", shadows=[
+        {"model_version": 3, "prediction": 18.0}])]})])
+    assert rows[["model_version", "role", "arm"]].values.tolist() == [["9", "served", "candidate"],
+                                                                       ["3", "shadow", "candidate"]]
+
+
+def test_an_answer_without_an_arm_logs_none():
+    rows = log_rows([message("response", {"predictions": [answer(arm="absent")]})])
+    assert rows["arm"].tolist() == [None]
+
+
+def test_a_group_created_before_a_column_was_added_gets_it_appended():
+    from types import SimpleNamespace
+
+    from src.inference_pipeline.log import SCHEMA, _predictions_group
+
+    appended = []
+    old = SimpleNamespace(features=[SimpleNamespace(name=n) for n in SCHEMA if n != "arm"],
+                          append_features=lambda fs: appended.extend((f.name, f.type) for f in fs))
+    fs = SimpleNamespace(get_or_create_feature_group=lambda **kwargs: old)
+    assert _predictions_group(fs) is old
+    assert appended == [("arm", "string")]
 
 
 def test_a_fallback_is_logged_under_what_served_it():

@@ -1,12 +1,12 @@
-"""Which registered models serve: the champion from its lifecycle_status tag, and in shadow the challengers and the
-former champions retiring for less than 28 days."""
+"""Which registered models serve: the champion from its lifecycle_status tag, the candidate in canary or A/B with
+its traffic share, and in shadow the challengers and the former champions retiring for less than 28 days."""
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
-from src.registry import ServingSet, champion, record, serving_models
+from src.registry import ServingSet, arm, champion, record, serving_models
 
 TODAY = date(2026, 11, 2)
 
@@ -69,6 +69,78 @@ def test_no_champion_still_has_shadows():
     serving = serving_models(FakeRegistry(FakeModel(1, {"status": "challenger"})), TODAY)
     assert serving.champion is None
     assert versions(serving.shadows) == [1]
+
+
+@pytest.mark.parametrize("status", ["canary", "ab"])
+def test_a_canary_or_ab_model_is_the_candidate_with_its_share(status):
+    mr = FakeRegistry(FakeModel(1, "champion"), FakeModel(2, {"status": "challenger"}),
+                      FakeModel(3, {"status": status, "traffic": 0.25, "salt": "v3", "window": {"cutoff": "2026-09-30"}}))
+    serving = serving_models(mr, TODAY)
+    assert serving.candidate.version == 3
+    assert (serving.traffic, serving.salt) == (0.25, "v3")
+    assert versions(serving.shadows) == [2]
+
+
+def test_no_candidate_serves_nothing_to_it():
+    serving = serving_models(FakeRegistry(FakeModel(1, "champion")), TODAY)
+    assert (serving.candidate, serving.traffic, serving.salt) == (None, 0.0, None)
+
+
+def test_two_candidates_is_an_error():
+    mr = FakeRegistry(FakeModel(1, {"status": "canary", "traffic": 0.1, "salt": "a", "window": {"cutoff": "2026-09-30"}}),
+                      FakeModel(2, {"status": "ab", "traffic": 0.5, "salt": "b", "window": {"cutoff": "2026-09-30"}}))
+    with pytest.raises(ValueError, match="1, 2"):
+        serving_models(mr, TODAY)
+
+
+@pytest.mark.parametrize("tag", [{"status": "canary", "salt": "a", "window": {"cutoff": "2026-09-30"}},
+                                 {"status": "canary", "traffic": 0, "salt": "a", "window": {"cutoff": "2026-09-30"}},
+                                 {"status": "canary", "traffic": 1.5, "salt": "a", "window": {"cutoff": "2026-09-30"}},
+                                 {"status": "canary", "traffic": "lots", "salt": "a", "window": {"cutoff": "2026-09-30"}}])
+def test_a_candidate_needs_a_share_in_0_to_1(tag):
+    with pytest.raises(ValueError, match="traffic"):
+        serving_models(FakeRegistry(FakeModel(1, tag)), TODAY)
+
+
+def test_a_candidate_needs_a_salt():
+    with pytest.raises(ValueError, match="salt"):
+        serving_models(FakeRegistry(FakeModel(1, {"status": "canary", "traffic": 0.1, "window": {"cutoff": "2026-09-30"}})), TODAY)
+
+
+@pytest.mark.parametrize("window", [None, {}, {"cutoff": ""}])
+def test_a_candidate_needs_its_training_window(window):
+    tag = {"status": "canary", "traffic": 0.1, "salt": "a"} | ({} if window is None else {"window": window})
+    with pytest.raises(ValueError, match="window"):
+        serving_models(FakeRegistry(FakeModel(1, tag)), TODAY)
+
+
+CITY_DAYS = [(city, date(2026, 1, 1) + timedelta(days=d)) for city in ("London", "Tokyo", "Auckland", "Lima")
+             for d in range(1000)]
+
+
+def test_arm_is_the_same_for_the_same_city_day():
+    assert {arm("London", date(2026, 11, 3), "v3", 0.5) for _ in range(5)} in ({"candidate"}, {"champion"})
+
+
+def test_arm_gives_the_candidate_its_share():
+    share = sum(arm(c, d, "v3", 0.1) == "candidate" for c, d in CITY_DAYS) / len(CITY_DAYS)
+    assert 0.08 < share < 0.12
+
+
+def test_raising_the_share_only_moves_city_days_to_the_candidate():
+    at_10 = {cd for cd in CITY_DAYS if arm(*cd, "v3", 0.10) == "candidate"}
+    at_25 = {cd for cd in CITY_DAYS if arm(*cd, "v3", 0.25) == "candidate"}
+    assert at_10 < at_25
+
+
+def test_a_new_salt_reshuffles_the_city_days():
+    a = {cd for cd in CITY_DAYS if arm(*cd, "v3", 0.5) == "candidate"}
+    b = {cd for cd in CITY_DAYS if arm(*cd, "v4", 0.5) == "candidate"}
+    assert a != b
+
+
+def test_full_traffic_sends_every_city_day_to_the_candidate():
+    assert all(arm(c, d, "v3", 1.0) == "candidate" for c, d in CITY_DAYS[:100])
 
 
 class SavedModel(FakeModel):

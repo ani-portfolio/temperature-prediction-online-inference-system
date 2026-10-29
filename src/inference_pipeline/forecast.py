@@ -4,7 +4,9 @@ predictor does the lookups and calls this, so every rule is unit tested without 
 A feature row for target date T holds inputs up to T minus 2 days, and its temperature_2m_max_lag_2d is the maximum
 on T minus 2, which is persistence. The newest row with that value decides the path:
 
-  the row for tomorrow                  the champion; persistence when it fails (model_error) or there is none
+  the row for tomorrow                  the champion, or the candidate on the city-days registry.arm gives it;
+                                        persistence when the assigned model fails (model_error) or there is no
+                                        champion (no_champion). Every other model predicts in shadow.
   1 day older                           persistence from that row (awaiting_today): the feature job runs once a day,
                                         so tomorrow's row is missing from local midnight until its next run
   2 or 3 days older                     persistence from that row (stale): a daily run was missed
@@ -22,7 +24,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from src.download_weather import TIMEZONES
-from src.registry import ServingSet
+from src.registry import ServingSet, arm
 
 CONTRACT = ("city", "target_date", "forecast_max_c", "model_version", "fallback_used", "fallback_reason",
             "inputs_as_of")
@@ -71,15 +73,16 @@ def _predict(model: Model, row: dict) -> float | None:
 
 def forecast(city: str, now: datetime, rows: dict[date, dict], models: ServingSet, request_id: str) -> dict:
     """The response for one request. rows holds the feature rows found for lookup_keys, by target date; models holds
-    the champion (None before the first promotion) and the shadows, as Model. Raises KeyError for a city that is not
-    served and LookupError when no row gives a forecast."""
+    the champion (None before the first promotion), the candidate with its share, and the shadows, as Model. Raises
+    KeyError for a city that is not served and LookupError when no row gives a forecast."""
     tomorrow = _tomorrow(city, now)
 
-    def response(value, version, reason, as_of, feature_row, persistence, shadows=()):
+    def response(value, version, reason, as_of, feature_row, persistence, shadows=(), assigned=None):
         return {"city": city, "target_date": tomorrow.isoformat(), "forecast_max_c": value, "model_version": version,
                 "fallback_used": reason is not None, "fallback_reason": reason, "inputs_as_of": as_of.isoformat(),
                 "log": {"request_id": request_id, "persistence_c": persistence,
-                        "feature_row": feature_row and feature_row.isoformat(), "shadows": list(shadows)}}
+                        "feature_row": feature_row and feature_row.isoformat(), "shadows": list(shadows),
+                        "arm": assigned}}
 
     for k in range(STALE_DAYS + 1):
         day = tomorrow - timedelta(days=k)
@@ -90,13 +93,19 @@ def forecast(city: str, now: datetime, rows: dict[date, dict], models: ServingSe
         if k:
             return response(persistence, "persistence", "awaiting_today" if k == 1 else "stale", as_of, day,
                             persistence)
-        shadows = [{"model_version": m.version, "prediction": _predict(m, rows[day])} for m in models.shadows]
-        if models.champion is None:
-            return response(persistence, "persistence", "no_champion", as_of, day, persistence, shadows)
-        value = _predict(models.champion, rows[day])
+        assigned = "champion"
+        if models.candidate is not None:
+            assigned = arm(city, tomorrow, models.salt, models.traffic)
+        served, other = ((models.candidate, models.champion) if assigned == "candidate"
+                         else (models.champion, models.candidate))
+        shadows = [{"model_version": m.version, "prediction": _predict(m, rows[day])}
+                   for m in [other, *models.shadows] if m is not None]
+        if served is None:
+            return response(persistence, "persistence", "no_champion", as_of, day, persistence, shadows, assigned)
+        value = _predict(served, rows[day])
         if value is None:
-            return response(persistence, "persistence", "model_error", as_of, day, persistence, shadows)
-        return response(value, models.champion.version, None, as_of, day, persistence, shadows)
+            return response(persistence, "persistence", "model_error", as_of, day, persistence, shadows, assigned)
+        return response(value, served.version, None, as_of, day, persistence, shadows, assigned)
 
     seasonal_day = tomorrow - timedelta(days=SEASONAL_ROW_DAYS)
     seasonal = _value((rows.get(seasonal_day) or {}).get(PERSISTENCE))

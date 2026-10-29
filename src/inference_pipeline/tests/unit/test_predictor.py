@@ -22,8 +22,10 @@ class Model:
 
 
 class Registry:
+    models = (Model(3, "champion"), Model(4, "challenger"))
+
     def get_models(self, name):
-        return [Model(3, "champion"), Model(4, "challenger")]
+        return list(self.models)
 
 
 class FeatureView:
@@ -78,6 +80,18 @@ def test_loads_the_champion_and_shadows_and_starts_serving():
     assert s.models.champion.version == 3
     assert [m.version for m in s.models.shadows] == [4]
     assert fv.calls == ["init"]
+
+
+def test_loads_the_candidate_with_its_share(monkeypatch):
+    monkeypatch.setattr(Registry, "models", (*Registry.models,
+                                             Model(9, '{"status": "canary", "traffic": 0.1, "salt": "v9", '
+                                                       '"window": {"cutoff": "2026-09-30"}}')))
+    fv = FeatureView({})
+    s = predictor.Server(Project(fv), today=date(2026, 10, 23), load=lambda m: Fixed(float(m.version)))
+    assert s.models.candidate.version == 9
+    assert s.models.candidate.pipeline.value == 9.0
+    assert (s.models.traffic, s.models.salt) == (0.1, "v9")
+    assert [m.version for m in s.models.shadows] == [4]
 
 
 def test_answers_each_city_with_one_lookup():

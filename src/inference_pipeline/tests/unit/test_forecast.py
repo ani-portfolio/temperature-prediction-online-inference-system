@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from src.inference_pipeline.forecast import CONTRACT, Model, forecast, lookup_keys
-from src.registry import ServingSet
+from src.registry import ServingSet, arm
 
 PERSISTENCE = "temperature_2m_max_lag_2d"
 NOON = datetime(2026, 10, 23, 23, 0, tzinfo=UTC)        # 12:00 on 2026-10-24 in Auckland (UTC+13)
@@ -43,6 +43,17 @@ def models(champion=CHAMPION, *shadows):
                       [Model(4 + i, s) for i, s in enumerate(shadows)])
 
 
+def salt_for(wanted, traffic=0.5):
+    """A salt that puts Auckland's tomorrow in the wanted arm."""
+    return next(s for s in map(str, range(100)) if arm("Auckland", TOMORROW, s, traffic) == wanted)
+
+
+def with_candidate(candidate, wanted, champion=CHAMPION, *shadows):
+    """The serving set with candidate v9 at a 50% share, salted so tomorrow lands in the wanted arm."""
+    serving = models(champion, *shadows)
+    return ServingSet(serving.champion, serving.shadows, Model(9, candidate), 0.5, salt_for(wanted))
+
+
 def test_lookup_keys_are_tomorrow_to_three_days_back_and_the_seasonal_row():
     assert lookup_keys("Auckland", NOON) == [("Auckland", date(2026, 10, 25)), ("Auckland", date(2026, 10, 24)),
                                              ("Auckland", date(2026, 10, 23)), ("Auckland", date(2026, 10, 22)),
@@ -62,7 +73,43 @@ def test_a_fresh_row_is_served_by_the_champion():
     assert r["fallback_used"] is False and r["fallback_reason"] is None
     assert r["inputs_as_of"] == "2026-10-23"
     assert r["log"] == {"request_id": "req-1", "persistence_c": 17.0, "feature_row": "2026-10-25",
-                        "shadows": []}
+                        "shadows": [], "arm": "champion"}
+
+
+def test_the_candidate_serves_its_city_days_and_the_champion_is_logged():
+    r = forecast("Auckland", NOON, fresh_rows(), with_candidate(Fixed(20.0), "candidate", CHAMPION, Fixed(19.0)),
+                 "req-1")
+    assert (r["forecast_max_c"], r["model_version"], r["fallback_used"]) == (20.0, 9, False)
+    assert r["log"]["arm"] == "candidate"
+    assert r["log"]["shadows"] == [{"model_version": 3, "prediction": 18.4}, {"model_version": 4, "prediction": 19.0}]
+
+
+def test_the_champion_serves_its_city_days_and_the_candidate_is_logged():
+    r = forecast("Auckland", NOON, fresh_rows(), with_candidate(Fixed(20.0), "champion"), "req-1")
+    assert (r["forecast_max_c"], r["model_version"]) == (18.4, 3)
+    assert r["log"]["arm"] == "champion"
+    assert r["log"]["shadows"] == [{"model_version": 9, "prediction": 20.0}]
+
+
+def test_a_failing_candidate_falls_back_to_persistence_and_the_champion_is_still_logged():
+    r = forecast("Auckland", NOON, fresh_rows(), with_candidate(Broken(), "candidate"), "req-1")
+    assert (r["forecast_max_c"], r["model_version"], r["fallback_reason"]) == (17.0, "persistence", "model_error")
+    assert r["log"]["arm"] == "candidate"
+    assert r["log"]["shadows"] == [{"model_version": 3, "prediction": 18.4}]
+
+
+def test_a_candidate_without_a_champion_still_serves_its_city_days():
+    r = forecast("Auckland", NOON, fresh_rows(), with_candidate(Fixed(20.0), "candidate", None), "req-1")
+    assert (r["forecast_max_c"], r["model_version"]) == (20.0, 9)
+    r = forecast("Auckland", NOON, fresh_rows(), with_candidate(Fixed(20.0), "champion", None), "req-1")
+    assert (r["model_version"], r["fallback_reason"]) == ("persistence", "no_champion")
+    assert r["log"]["shadows"] == [{"model_version": 9, "prediction": 20.0}]
+
+
+def test_a_fallback_before_any_model_has_no_arm():
+    rows = {date(2026, 10, 24): row(date(2026, 10, 24), 16.0)}
+    r = forecast("Auckland", NOON, rows, with_candidate(Fixed(20.0), "candidate"), "req-1")
+    assert (r["fallback_reason"], r["log"]["arm"]) == ("awaiting_today", None)
 
 
 def test_shadows_are_logged_and_never_served():

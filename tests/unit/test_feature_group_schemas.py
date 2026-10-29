@@ -28,13 +28,14 @@ class FeatureStore:
         return SimpleNamespace(**kwargs)
 
 
-def predictions(reason):
+def predictions(reason, arm=None):
     """log_rows on one inference log response, as the log job decodes it from Kafka."""
     out = io.BytesIO()
     payload = {"predictions": [{
         "city": "Rome", "target_date": "2026-10-30", "forecast_max_c": 19.7, "model_version": 2,
         "fallback_used": reason is not None, "fallback_reason": reason, "inputs_as_of": "2026-10-28",
-        "log": {"request_id": "req-1", "persistence_c": 18.9, "feature_row": "2026-10-30", "shadows": []}}]}
+        "log": {"request_id": "req-1", "persistence_c": 18.9, "feature_row": "2026-10-30", "shadows": [],
+                "arm": arm}}]}
     fastavro.schemaless_writer(out, fastavro.parse_schema(log.ENVELOPE), {
         "modelId": 1, "modelName": "temperature_max_forecast", "modelVersion": 2, "requestTimestamp": 1793318280,
         "responseHttpCode": 200, "inferenceId": "inf-1", "messageType": "org.kubeflow.serving.inference.response",
@@ -69,13 +70,20 @@ def check_reports(all_none):
     return pd.DataFrame(rows, columns=checks.CHECK_COLUMNS).assign(as_of=lambda d: pd.to_datetime(d["as_of"]))
 
 
+def canary_reports(since):
+    p = predictions(None, "candidate").assign(model_version="9")
+    row = checks.canary_row(p, "9", "canary", 0.1, since, AS_OF)
+    return pd.DataFrame([row]).assign(as_of=lambda d: pd.to_datetime(d["as_of"]))   # as run_daily inserts it
+
+
 # (the group, a frame with every optional column filled, a frame with some columns all None)
 GROUPS = {
-    "predictions": (log._predictions_group, predictions("stale"), predictions(None)),
+    "predictions": (log._predictions_group, predictions("stale", "champion"), predictions(None)),
     "scored_predictions": (scores.scored_group, scored(), scored().assign(persistence_c=None,
                                                                           persistence_abs_error=None)),
     "gate_reports": (gate.reports_group, gate_reports(True), gate_reports(False)),
     "monitoring_reports": (checks.reports_group, check_reports(False), check_reports(True)),
+    "canary_reports": (checks.canary_group, canary_reports(date(2026, 10, 20)), canary_reports(None)),
 }
 
 

@@ -65,9 +65,38 @@ restart (`project.get_model_serving().get_deployment("temperatureforecast")`, th
 
 A new challenger from the gate job is shadowed only after a restart; the gate job prints a reminder.
 
+## Rolling out a model: canary, then A/B
+Optional, between shadow and promotion: challenger (shadow) → canary at 10% → canary at 25% → ab at 50% → champion.
+The predictor serves the candidate on its share of city-days, chosen by a hash of salt, city, and target date, so
+every request for a city on a day gets the same model. On every city-day both models predict, the other one in
+shadow, so the live gate keeps its paired comparison throughout. Every step is a tag edit and a restart.
+
+Edit the candidate's tag, keeping the rest of its record, `window` especially: the live gate needs its cutoff,
+and the predictor refuses to start without it. Only one model may be in `canary` or `ab`.
+1. Canary at 10%: `{"status": "canary", "traffic": 0.1, "salt": "v<version>-<date>", "since": "<today>", ...}`.
+   Use a new salt for each rollout so the same city-days are not always the candidate's.
+2. Read `canary_reports` (below) each day. Move on once the step has about 20 `candidate_city_days` with
+   `breaches` 0: set `traffic` to 0.25 and `since` to today. Raising the share only adds city-days to the candidate.
+3. A/B: `{"status": "ab", "traffic": 0.5, "since": "<today>", ...}`, same salt. Fix the window first, with
+   `/ab-test-design`, and do not end it early on a good looking result.
+4. At the end of the window, run `/ab-data-validation` (the sample ratio check against 50/50: rebuild each
+   city-day's arm with `src.registry.arm` to catch a broken assignment), `/ab-analysis`, and `/ab-readout` on the
+   rows of `predictions` with an `arm`, joined to `scored_predictions`. Put the A/B estimate next to the candidate's
+   `gate_reports` row: the paired live gate decides, and the A/B result shows how much less an unpaired split can
+   see.
+5. Promote as above: the candidate's tag becomes `champion`.
+
+With 50 cities there are at most about 50 city-days a day, and only while the laptop's simulator is running.
+More requests make the canary faster but add nothing to the A/B test beyond covering more cities, since every
+request for a city-day gets the same answer and the same actual.
+
 ## Reading the monitoring reports
-The job `monitoring_pipeline_daily` (13:30 UTC) writes three feature groups and sends nothing; read them yourself.
-* `gate_reports`: one row per shadow model per day against the champion on the same live city-days. A challenger
+The job `monitoring_pipeline_daily` (13:30 UTC) writes these feature groups and sends nothing; read them yourself.
+* `canary_reports`, during a rollout: one row per day for the candidate, counted per city-day since its tag's
+  `since`. `implausible` counts forecasts more than 15 C (`threshold_c`) from persistence or outside the contract
+  range; `missing` counts predictions it failed to make, in shadow or on its own city-days, where the caller got
+  persistence. Any breach flags the row: roll back and find out why before trying again.
+* `gate_reports`: one row per shadow model, and the candidate, per day against the champion on the same live city-days. A challenger
   with `p_one_sided` under 0.05 supports a promotion; a retiring model with it supports a rollback. The newest row is
   also in the model's tag, as `live`. The test waits for 14 shared days.
 * `monitoring_reports`: one row per check per day, with `flagged`. `input_psi` and `prediction_psi` compare the last
@@ -84,6 +113,7 @@ so its `prediction_psi` row says `no_reference`.
 ## Rolling back
 * A model: tag the bad champion `rejected` (or `retiring` with today's date), tag the previous one `champion`, then
   restart the deployment.
+* A candidate in canary or ab: tag it `challenger` (it goes back to shadow) or `rejected`, then restart.
 * Code, usually: `git revert` the change on `main`; the revert deploys like any merge.
 * Code, quickly: Actions, deploy, Run workflow, with `ref` set to an earlier commit of `main`.
 
