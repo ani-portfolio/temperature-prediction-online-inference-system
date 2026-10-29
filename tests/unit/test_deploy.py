@@ -235,3 +235,39 @@ def test_the_src_zip_holds_the_code_without_tests_and_imports(tmp_path):
     out = subprocess.run([sys.executable, "-I", "-c", code, str(path)], check=False, capture_output=True, text=True, cwd=tmp_path)
     assert out.returncode == 0, out.stderr
     assert "src.zip" in out.stdout
+
+
+class LiveDeployment:
+    """A deployment Hopsworks holds, saved with whatever inference logger it is given."""
+    def __init__(self, topic):
+        from hsml.inference_logger import InferenceLogger
+
+        self.script_file, self.environment = "predictor.py", "pandas-inference-pipeline"   # Hopsworks keeps the name
+        self.inference_logger = InferenceLogger(kafka_topic={"name": topic}) if topic else None
+        self.calls = []
+
+    def save(self):
+        self.calls.append("save")
+
+    def stop(self):
+        self.calls.append("stop")
+
+    def start(self):
+        self.calls.append("start")
+
+
+def test_a_redeploy_keeps_the_log_topic_so_unread_requests_are_not_stranded():
+    live = LiveDeployment("temperatureforecast-inf0497")
+    report = DeployReport("abc", False)
+    _sync_deployment(empty_project(live), load_settings(ROOT), report)
+    assert live.calls == ["save", "stop", "start"]   # saved every deploy: Hopsworks copies the script on save
+    assert live.inference_logger.kafka_topic.name == "temperatureforecast-inf0497"
+    assert live.inference_logger.mode == "ALL"
+    assert live.environment == INFERENCE_ENVIRONMENT
+
+
+def test_a_deployment_without_a_log_topic_gets_a_new_one():
+    live = LiveDeployment(None)
+    _sync_deployment(empty_project(live), load_settings(ROOT), DeployReport("abc", False))
+    assert live.inference_logger.kafka_topic.name == "CREATE"
+    assert live.inference_logger.mode == "ALL"
