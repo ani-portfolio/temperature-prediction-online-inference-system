@@ -28,7 +28,7 @@ _PARSED = fastavro.parse_schema(ENVELOPE)
 SCHEMA = {"request_id": "string", "model_version": "string", "request_time": "timestamp", "city": "string",
           "target_date": "timestamp", "role": "string", "prediction": "double", "fallback_used": "boolean",
           "fallback_reason": "string", "inputs_as_of": "timestamp", "feature_row": "timestamp",
-          "persistence_c": "double"}
+          "persistence_c": "double", "arm": "string"}
 COLUMNS = list(SCHEMA)
 KEY = ["request_id", "model_version"]
 CONSUMER_GROUP = "inference_pipeline_log"
@@ -51,7 +51,8 @@ def _rows(envelope: dict) -> list[dict]:
         common = {"request_id": log.get("request_id"), "request_time": when, "city": p["city"],
                   "target_date": p["target_date"], "fallback_used": p["fallback_used"],
                   "fallback_reason": p["fallback_reason"], "inputs_as_of": p["inputs_as_of"],
-                  "feature_row": log.get("feature_row"), "persistence_c": log.get("persistence_c")}
+                  "feature_row": log.get("feature_row"), "persistence_c": log.get("persistence_c"),
+                  "arm": log.get("arm")}
         out.append({**common, "model_version": str(p["model_version"]), "role": "served",
                     "prediction": p["forecast_max_c"]})
         out += [{**common, "model_version": str(s["model_version"]), "role": "shadow", "prediction": s["prediction"]}
@@ -73,10 +74,16 @@ def _predictions_group(fs):
     from hsfs.feature import Feature
 
     name, version = platform.PREDICTIONS
-    return fs.get_or_create_feature_group(
+    fg = fs.get_or_create_feature_group(
         name=name, version=version, primary_key=KEY, event_time="request_time", online_enabled=False,
         features=[Feature(n, t) for n, t in SCHEMA.items()],
         description="Every model's prediction per answered request, from the predictor's inference log.")
+    # an existing group keeps the schema it was created with; columns added since (arm) are appended, None in old rows
+    have = {f.name for f in fg.features}
+    missing = [Feature(n, t) for n, t in SCHEMA.items() if n not in have]
+    if missing:
+        fg.append_features(missing)
+    return fg
 
 
 def run_log() -> int:

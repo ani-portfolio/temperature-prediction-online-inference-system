@@ -1,4 +1,5 @@
-"""The daily monitoring job: label feedback, then the live gate, then the checks, each written to its feature group.
+"""The daily monitoring job: label feedback, then the live gate, then the checks, then the canary guardrail when a
+candidate is in canary or ab, each written to its feature group.
 
 The live gate and the performance check read the scores, so they are skipped when label feedback fails; drift and
 the served share do not need labels and still run. Any failed step fails the job at the end, so the platform's job
@@ -66,7 +67,7 @@ def run_daily(today: date | None = None) -> DailyReport:
     predictions = _read(fs, platform.PREDICTIONS)
     if predictions is None:
         predictions = pd.DataFrame(columns=["model_version", "role", "fallback_reason", "request_time", "city",
-                                            "target_date", "prediction", "persistence_c"])
+                                            "target_date", "prediction", "persistence_c", "arm"])
 
     def label_feedback():
         old = _read(fs, platform.SCORED_PREDICTIONS)
@@ -82,16 +83,18 @@ def run_daily(today: date | None = None) -> DailyReport:
     serving = serving_models(mr, today)
     champ = serving.champion
 
+    compared = [m for m in [serving.candidate, *serving.shadows] if m is not None]
+
     def live_gate():
         rows = []
-        for shadow in serving.shadows:
+        for shadow in compared:
             cutoffs = {str(champ.version): _cutoff(champ), str(shadow.version): _cutoff(shadow)}
             r = gate.live_gate(scored, str(champ.version), str(shadow.version), cutoffs, as_of)
             r["status"] = record(shadow).get("status")
             rows.append(r)
         if rows:
             gate.reports_group(fs).insert(_as_of_time(pd.DataFrame(rows)), wait=True)
-            for shadow, r in zip(serving.shadows, rows):   # the table first: it is the record, the tag a copy
+            for shadow, r in zip(compared, rows):   # the table first: it is the record, the tag a copy
                 set_live(shadow, r)
         report.gate_reports = rows
 
@@ -121,6 +124,17 @@ def run_daily(today: date | None = None) -> DailyReport:
         report.flagged = [f"{r.check} {r.subject}: {r.value}" for r in out.itertuples() if r.flagged]
 
     _step(report, "checks", daily_checks)
+
+    def canary_check():
+        tag = record(serving.candidate)
+        since = date.fromisoformat(tag["since"]) if tag.get("since") else None
+        r = checks.canary_row(predictions, str(serving.candidate.version), tag["status"], serving.traffic, since, as_of)
+        checks.canary_group(fs).insert(_as_of_time(pd.DataFrame([r])), wait=True)
+        if r["flagged"]:
+            report.flagged.append(f"canary v{r['model_version']}: {r['breaches']} breaches")
+
+    if serving.candidate is not None:
+        _step(report, "canary", canary_check)
     if report.errors:
         raise RuntimeError("Monitoring steps failed:\n" + "\n".join(report.errors))
     return report

@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-29T17:08:52'
+  updated: '2026-10-29T17:19:01'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2132,6 +2132,11 @@ system:
           after both models' training cutoffs, with the same one sided Diebold-Mariano test at alpha 0.05
         live: the challenger predicts in shadow next to the champion; both are scored on the same city-days, and
           the owner promotes by hand once the test is significant
+        rollout: challenger (shadow) -> canary -> ab -> champion, each step a tag edit and a restart by hand; the
+          canary or ab tag holds traffic (the share of city-days), salt, since (the day the step began), and the
+          challenger's window; canary serves the candidate on 10% then 25% of city-days, each step held until about
+          20 candidate city-days with no guardrail breach; ab serves it on 50% for a window fixed in advance, read
+          with the ab- skills next to the paired live gate; the live gate decides the promotion
         after_promotion: the previous champion stays in shadow for 28 days, then is retired
         lineage: model version, MLflow run id, feature view version, features hash, training dataset version
       reason: A paired significance test on the daily MAE gap judges two models on the same days, so the seasonal
@@ -2146,12 +2151,14 @@ system:
           tagged retiring less than 28 days ago predict in shadow; per request, one batch lookup in the online feature
           view of the city''s rows for tomorrow (its local date plus one), the three days before, and tomorrow minus
           362 days (the seasonal row); a fresh row for tomorrow goes to the champion and every shadow, otherwise
-          the fallback'
+          the fallback; with a candidate in canary or ab, a sha256 hash of salt, city, and target date assigns each
+          city-day to the candidate or the champion (raising traffic only moves city-days to the candidate), the
+          assigned model serves, and the other predicts in shadow; a failing assigned model serves persistence'
         logging: the KServe inference logger (mode ALL) writes every request and response to the deployment's Kafka
           topic; the job inference_pipeline_log reads it every 6 hours and writes one row per model per answered
           city to the offline feature group predictions (key request id and model version; request time, city, target
           date, served or shadow, prediction, fallback used and reason, inputs as of, feature row, the persistence
-          forecast)
+          forecast, the city-day's arm)
         dedup: label feedback keeps the first row per city, target date, and model, since repeat requests on a day
           use the same features
       reason: Online inference is the learning goal and the framing's cadence; logging every model's prediction
@@ -2185,9 +2192,9 @@ system:
         output: city, target date, model version, served or shadow, prediction, actual, absolute error, persistence_c
           and its absolute error; model rows only (fallback rows stay in predictions); the first row per city, target
           date, and model
-        live_gate: every shadow model (challengers and retiring) against the champion on the city-days both scored,
-          after both training cutoffs, one sided Diebold-Mariano from 14 shared days; written to the feature group
-          gate_reports and copied to the model's tag as its live block
+        live_gate: the candidate and every shadow model (challengers and retiring) against the champion on the city-days
+          both scored, after both training cutoffs, one sided Diebold-Mariano from 14 shared days; written to the
+          feature group gate_reports and copied to the model's tag as its live block
       reason: The gate's test and monitoring read only this table, so the join is done once.
     monitoring:
       needed: true
@@ -2204,6 +2211,9 @@ system:
         system_health: the daily share of served answers from a model, not counting awaiting_today (flag under 95%),
           and failed jobs through the platform's job failure alerts; predictor errors and latency are not measured
           yet
+        canary_guardrail: for a candidate in canary or ab, the city-days since its step began on which its forecast
+          was more than 15 C from persistence, outside the contract range, or missing (None in shadow, or model_error
+          on its own city-day); one row a day in the feature group canary_reports, flagged on any breach
         alerts: none sent by the job; every check is a row in the feature group monitoring_reports with a flag,
           which the owner reads; the job fails when a step fails, so the platform's job failure email reaches the
           owner
@@ -2304,9 +2314,17 @@ system:
         about half of each day on average (about 1 hour in Auckland, 12 in London, 21 in Tokyo).
       resolution: Accepted by the user to save compute; the traffic simulator's random requests fall in this gap
         about half the time, like real traffic, and the 95% model-served target leaves awaiting_today out.
+    - problem: An unpaired A/B test has little power here; at 50/50 with about 25 city-days per arm a day, a 0.066
+        C MAE gap (ridge against lightgbm on test) would take about a year and a half to detect.
+      resolution: Accepted by the user; the A/B test runs for a window fixed in advance and is read against the
+        paired live gate, which decides the promotion.
+    - problem: The canary is stepped and rolled back by hand, so a candidate with breaches keeps serving its share
+        until the owner reads canary_reports.
+      resolution: Accepted by the user; a candidate that fails a prediction already falls back to persistence per
+        request, and the guardrail catches plausible looking garbage within a day.
   doc: docs/system_design.md
-  run_at: '2026-10-29T17:08:51'
-  doc_hash: b709b3db4067b266
+  run_at: '2026-10-29T17:19:01'
+  doc_hash: c9813759f25c18d8
 iterations:
   current: null
   entries:
@@ -2607,6 +2625,13 @@ decisions:
     decision: 'Deploy with Hopsworks Git integration: the owner runs deploy.apply and deploy.smoke by hand from
       GitHub Actions; jobs are set in each pipeline''s jobs/jobs.yaml.'
     reason: The user chose it while planning the deployment; see docs/deployment.md.
+  - date: '2026-10-29'
+    stage: system
+    decision: Roll a challenger out as challenger (shadow), then canary at 10% and 25% of city-days, then a fixed
+      50/50 A/B test, then champion, split inside the predictor by a hash of salt, city, and target date, stepped
+      and rolled back by hand, with an implausible value guardrail and the paired live gate as the decider.
+    reason: The user's choice, mainly to learn canary and A/B rollouts; Hopsworks has no traffic split, and the
+      city-day keeps every request for a city on a day consistent and matches the scored unit.
 history:
   - at: '2026-10-20T12:00:53'
     skill: ml-project-setup
@@ -2903,6 +2928,12 @@ history:
     skill: ml-system-design
     action: wrote system from its notebook
   - at: '2026-10-29T17:08:52'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-29T17:19:01'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-29T17:19:01'
     skill: ml-system-design
     action: wrote docs/system_design.md
 version:
