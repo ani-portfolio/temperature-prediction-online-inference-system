@@ -61,6 +61,7 @@ def log_rows(values: list[bytes]) -> pd.DataFrame:
         df[c] = pd.to_datetime(df[c])
     df["prediction"] = pd.to_numeric(df["prediction"]).astype("float64")
     df["persistence_c"] = pd.to_numeric(df["persistence_c"]).astype("float64")
+    df["fallback_reason"] = df["fallback_reason"].astype("string")   # all None when the model served every answer
     return df.drop_duplicates(KEY).reset_index(drop=True)
 
 

@@ -1,12 +1,10 @@
-# Simulated traffic for the deployed predictor: every hour, 0 to 10 requests for random cities at random times, so
-# the live gate and monitoring have predictions to score. Runs on GitHub, not Hopsworks, because each run waits most
-# of the hour and Hopsworks compute is billed while a job waits. Scheduled runs can start late or be skipped, and
-# GitHub turns the schedule off after 60 days without a commit to the repository.
+# Simulated traffic for the deployed predictor: one hour of 0 to 10 requests for random cities at random times, so
+# the live gate and monitoring have predictions to score. Runs only by hand (Actions, simulate, Run workflow); each
+# run covers one hour. Runs on GitHub, not Hopsworks, because each run waits most of the hour and Hopsworks compute
+# is billed while a job waits.
 name: simulate
 
 on:
-  schedule:
-    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       seed:

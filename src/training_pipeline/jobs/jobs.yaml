@@ -1,4 +1,4 @@
-# The Hopsworks jobs of the training pipeline, applied by `python -m deploy.apply` on every merge to main.
+# The Hopsworks jobs of the training pipeline, applied by `python -m deploy.apply` on every deploy.
 # Both run by hand (no schedule): the owner starts training after reading the monitoring reports.
 jobs:
   training_pipeline_train:
