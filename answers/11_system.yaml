@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-28T19:43:52'
+saved_at: '2026-10-29T17:08:52'
 command:
   - design.py
-  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_27xvzxd5.yaml
+  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_ej575lxz.yaml
 answers:
   status: confirmed
   platform:

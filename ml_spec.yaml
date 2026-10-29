@@ -10,7 +10,7 @@ project:
   kernel: 16_weather_prediction
   kernel_display: 16_weather_prediction (.venv, Python 3.11.8)
   created: '2026-10-20T12:00:53'
-  updated: '2026-10-28T19:43:52'
+  updated: '2026-10-29T17:08:52'
 paths:
   data_raw: data/raw
   data_processed: data/processed
@@ -2276,11 +2276,11 @@ system:
       resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
     - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
         may take months to reach significance.
-      resolution: A traffic simulator (.github/workflows/simulate.yml on GitHub Actions) sends 0 to 10 single-city
-        requests in one hour for random cities at random times; about half reach the model and the rest fall in
-        a city's awaiting_today gap. The user chose random traffic over full daily coverage to mimic real use while
-        improvements are built and shadowed, and runs it by hand, one hour per run, so the gate gets data only on
-        days the owner runs it and may still take months.
+      resolution: A traffic simulator (src/inference_pipeline/jobs/simulate.py, run every hour by a launchd agent
+        on the owner's laptop) sends 0 to 60 single-city requests in each hour for random cities at random times;
+        about half reach the model and the rest fall in a city's awaiting_today gap. The user chose random traffic
+        over full daily coverage to mimic real use while improvements are built and shadowed, and runs it locally
+        rather than on GitHub Actions, so the gate gets data only while the laptop is on and online.
     - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
@@ -2305,8 +2305,8 @@ system:
       resolution: Accepted by the user to save compute; the traffic simulator's random requests fall in this gap
         about half the time, like real traffic, and the 95% model-served target leaves awaiting_today out.
   doc: docs/system_design.md
-  run_at: '2026-10-28T19:43:52'
-  doc_hash: a6921bc6d27728d2
+  run_at: '2026-10-29T17:08:51'
+  doc_hash: b709b3db4067b266
 iterations:
   current: null
   entries:
@@ -2897,6 +2897,12 @@ history:
     skill: ml-system-design
     action: wrote system from its notebook
   - at: '2026-10-28T19:43:52'
+    skill: ml-system-design
+    action: wrote docs/system_design.md
+  - at: '2026-10-29T17:08:51'
+    skill: ml-system-design
+    action: wrote system from its notebook
+  - at: '2026-10-29T17:08:52'
     skill: ml-system-design
     action: wrote docs/system_design.md
 version:
