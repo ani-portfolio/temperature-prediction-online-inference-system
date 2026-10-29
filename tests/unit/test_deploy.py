@@ -271,3 +271,64 @@ def test_a_deployment_without_a_log_topic_gets_a_new_one():
     _sync_deployment(empty_project(live), load_settings(ROOT), DeployReport("abc", False))
     assert live.inference_logger.kafka_topic.name == "CREATE"
     assert live.inference_logger.mode == "ALL"
+
+
+class HttpError(Exception):
+    """What the client raises for an HTTP error: the response, with its status code."""
+    def __init__(self, code):
+        super().__init__(f"HTTP code: {code}")
+        self.response = SimpleNamespace(status_code=code)
+
+
+class Predictor:
+    """A deployment answering each request with the next of answers: a response, or an exception to raise."""
+    def __init__(self, *answers):
+        self.answers, self.requests = list(answers), 0
+
+    def predict(self, inputs):
+        self.requests += 1
+        answer = self.answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return {"predictions": [answer]}
+
+
+def deployed_project(deployment):
+    job = SimpleNamespace(run=lambda await_termination: SimpleNamespace(final_status="SUCCEEDED"))
+    serving = SimpleNamespace(get_deployment=lambda name: deployment)
+    return SimpleNamespace(get_model_serving=lambda: serving,
+                           get_job_api=lambda: SimpleNamespace(get_job=lambda name: job))
+
+
+@pytest.fixture
+def waits(monkeypatch):
+    out = []
+    module = sys.modules["deploy.smoke"]   # deploy.smoke as an attribute is the function deploy re-exports
+    monkeypatch.setattr(module.time, "sleep", out.append)
+    return out
+
+
+def test_a_503_right_after_the_restart_is_retried_once_after_a_minute(waits):
+    deployment = Predictor(HttpError(503), GOOD)
+    assert smoke(deployed_project(deployment)) == []
+    assert (deployment.requests, waits) == (2, [60])
+
+
+def test_a_503_on_the_retry_too_is_a_problem(waits):
+    deployment = Predictor(HttpError(503), HttpError(503))
+    with pytest.raises(HttpError):
+        smoke(deployed_project(deployment))
+    assert (deployment.requests, waits) == (2, [60])
+
+
+def test_any_other_error_is_not_retried(waits):
+    deployment = Predictor(HttpError(500), GOOD)
+    with pytest.raises(HttpError):
+        smoke(deployed_project(deployment))
+    assert (deployment.requests, waits) == (1, [])
+
+
+def test_a_good_first_answer_does_not_wait(waits):
+    deployment = Predictor(GOOD)
+    assert smoke(deployed_project(deployment)) == []
+    assert (deployment.requests, waits) == (1, [])
