@@ -23,8 +23,13 @@ ENVELOPE = {"type": "record", "name": "InferenceLog", "fields": [
     {"name": "responseHttpCode", "type": "int"}, {"name": "inferenceId", "type": "string"},
     {"name": "messageType", "type": "string"}, {"name": "payload", "type": "string"}]}
 _PARSED = fastavro.parse_schema(ENVELOPE)
-COLUMNS = ["request_id", "model_version", "request_time", "city", "target_date", "role", "prediction",
-           "fallback_used", "fallback_reason", "inputs_as_of", "feature_row", "persistence_c"]
+# The Hopsworks type of every column, declared so a batch whose column is all None (fallback_reason, when the model
+# served every answer) still inserts: without it the type is inferred from the batch, and None has none.
+SCHEMA = {"request_id": "string", "model_version": "string", "request_time": "timestamp", "city": "string",
+          "target_date": "timestamp", "role": "string", "prediction": "double", "fallback_used": "boolean",
+          "fallback_reason": "string", "inputs_as_of": "timestamp", "feature_row": "timestamp",
+          "persistence_c": "double"}
+COLUMNS = list(SCHEMA)
 KEY = ["request_id", "model_version"]
 CONSUMER_GROUP = "inference_pipeline_log"
 IDLE_SECONDS = 30      # stop reading when the topic has been quiet this long
@@ -61,14 +66,16 @@ def log_rows(values: list[bytes]) -> pd.DataFrame:
         df[c] = pd.to_datetime(df[c])
     df["prediction"] = pd.to_numeric(df["prediction"]).astype("float64")
     df["persistence_c"] = pd.to_numeric(df["persistence_c"]).astype("float64")
-    df["fallback_reason"] = df["fallback_reason"].astype("string")   # all None when the model served every answer
     return df.drop_duplicates(KEY).reset_index(drop=True)
 
 
 def _predictions_group(fs):
+    from hsfs.feature import Feature
+
     name, version = platform.PREDICTIONS
     return fs.get_or_create_feature_group(
         name=name, version=version, primary_key=KEY, event_time="request_time", online_enabled=False,
+        features=[Feature(n, t) for n, t in SCHEMA.items()],
         description="Every model's prediction per answered request, from the predictor's inference log.")
 
 
@@ -83,7 +90,9 @@ def run_log() -> int:
     config = project.get_kafka_api().get_default_config()
     config.update({"group.id": CONSUMER_GROUP, "auto.offset.reset": "earliest", "enable.auto.commit": False})
     consumer = Consumer(config)
-    consumer.subscribe([topic])
+    started = time.time()
+    consumer.subscribe([topic], on_assign=lambda _, parts: print(
+        f"assigned {len(parts)} partitions of {topic} after {time.time() - started:.0f}s"))
     values, quiet_since = [], time.time()
     try:
         while time.time() - quiet_since < IDLE_SECONDS:
@@ -94,6 +103,7 @@ def run_log() -> int:
                 raise RuntimeError(f"Reading {topic}: {msg.error()}")
             values.append(msg.value())
             quiet_since = time.time()
+        print(f"{len(values)} messages read")
         rows = log_rows(values)
         if len(rows):
             _predictions_group(project.get_feature_store()).insert(rows, wait=True)
