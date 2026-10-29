@@ -25,7 +25,11 @@ SERVED_SHARE_ALERT = 0.95
 NOT_COUNTED = "awaiting_today"  # the gap after local midnight until the daily feature run, by design
 FALLBACK_VERSION = "persistence"
 EVALUATION_MONTHLY_MAE = (1.79, 2.44)
-CHECK_COLUMNS = ["as_of", "check", "subject", "value", "threshold", "flagged", "rows", "note"]
+# The Hopsworks type of every column, declared so a batch whose column is all None (value, threshold, note) still
+# inserts
+SCHEMA = {"as_of": "timestamp", "check": "string", "subject": "string", "value": "double", "threshold": "double",
+          "flagged": "boolean", "rows": "bigint", "note": "string"}
+CHECK_COLUMNS = list(SCHEMA)
 
 
 def _row(as_of, check, subject, value=None, threshold=None, flagged=False, rows=0, note=None) -> dict:
@@ -111,7 +115,9 @@ def skipped_rows(checks: list[str], as_of: date, note: str) -> pd.DataFrame:
 
 
 def reports_group(fs):
+    from hsfs.feature import Feature
+
     name, version = platform.MONITORING_REPORTS
     return fs.get_or_create_feature_group(
         name=name, version=version, primary_key=["as_of", "check", "subject"], event_time="as_of",
-        online_enabled=False, description="Drift, live performance, and the model-served share, by the monitoring job.")
+        online_enabled=False, features=[Feature(n, t) for n, t in SCHEMA.items()], description="Drift, live performance, and the model-served share, by the monitoring job.")

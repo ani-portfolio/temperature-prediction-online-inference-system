@@ -14,8 +14,11 @@ from src import platform
 TARGET = "temperature_2m_max"
 FALLBACK_VERSION = "persistence"
 KEY = ["city", "target_date", "model_version"]
-COLUMNS = [*KEY, "role", "prediction", "actual", "abs_error", "persistence_c", "persistence_abs_error",
-           "request_time", "scored_at"]
+# The Hopsworks type of every column, declared so a batch whose column is all None still inserts
+SCHEMA = {"city": "string", "target_date": "timestamp", "model_version": "string", "role": "string",
+          "prediction": "double", "actual": "double", "abs_error": "double", "persistence_c": "double",
+          "persistence_abs_error": "double", "request_time": "timestamp", "scored_at": "timestamp"}
+COLUMNS = list(SCHEMA)
 
 
 def score(predictions: pd.DataFrame, actuals: pd.DataFrame, already_scored: pd.DataFrame,
@@ -43,7 +46,10 @@ def score(predictions: pd.DataFrame, actuals: pd.DataFrame, already_scored: pd.D
 
 
 def scored_group(fs):
+    from hsfs.feature import Feature
+
     name, version = platform.SCORED_PREDICTIONS
     return fs.get_or_create_feature_group(
         name=name, version=version, primary_key=KEY, event_time="target_date", online_enabled=False,
+        features=[Feature(n, t) for n, t in SCHEMA.items()],
         description="Every model's logged prediction joined to the actual maximum, by the monitoring job.")

@@ -19,6 +19,11 @@ from src.compare import daily_loss_difference, diebold_mariano
 ALPHA = 0.05
 MIN_DAYS = 14     # two of the test's 7 day lag windows; with fewer the variance can be 0 or negative
 TARGET = "actual"
+# The Hopsworks type of every gate_reports column, declared so a batch whose column is all None (model_mae,
+# champion_mae, and first_day before any shared day) still inserts. status is added by the monitoring job.
+SCHEMA = {"as_of": "timestamp", "model_version": "string", "champion_version": "string", "days": "bigint",
+          "rows": "bigint", "model_mae": "double", "champion_mae": "double", "stat": "double", "p_one_sided": "double",
+          "p_two_sided": "double", "first_day": "string", "alpha": "double", "status": "string"}
 
 
 def one_sided_better(d: pd.Series) -> dict:
@@ -66,7 +71,9 @@ def live_gate(scored: pd.DataFrame, champion_version: str, shadow_version: str, 
 
 
 def reports_group(fs):
+    from hsfs.feature import Feature
+
     name, version = platform.GATE_REPORTS
     return fs.get_or_create_feature_group(
         name=name, version=version, primary_key=["as_of", "model_version"], event_time="as_of",
-        online_enabled=False, description="Each shadow model against the champion on live days, by the monitoring job.")
+        online_enabled=False, features=[Feature(n, t) for n, t in SCHEMA.items()], description="Each shadow model against the champion on live days, by the monitoring job.")

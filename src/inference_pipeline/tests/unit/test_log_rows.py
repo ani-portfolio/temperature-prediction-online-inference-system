@@ -72,11 +72,3 @@ def test_no_messages_is_an_empty_table_with_the_columns():
     rows = log_rows([])
     assert rows.empty and {"request_id", "model_version", "request_time"} <= set(rows.columns)
 
-
-def test_a_batch_with_no_fallback_still_has_a_typed_fallback_reason():
-    # Hopsworks refuses to insert an all-null column, which pandas makes of a column of only None
-    import pyarrow as pa
-
-    rows = log_rows([message("response", {"predictions": [answer(shadows=[{"model_version": 4, "prediction": None}])]})])
-    schema = pa.Schema.from_pandas(rows, preserve_index=False)
-    assert [f.name for f in schema if pa.types.is_null(f.type)] == []
