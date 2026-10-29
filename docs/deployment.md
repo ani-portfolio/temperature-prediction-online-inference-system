@@ -95,6 +95,16 @@ CI uses the owner's personal Hopsworks API key, stored as the repository secret 
 read from `.env`. Rotating it means updating both: create a new key in Hopsworks, put it in `.env`, run
 `gh secret set HOPSWORKS_API_KEY`, then revoke the old one.
 
+## Simulated traffic
+Only requested cities get predictions, so a launchd agent on the owner's laptop runs the simulator every hour while
+the laptop is on and logged in: `python -m src.inference_pipeline.jobs.simulate --max-requests 60`, 0 to 60
+requests for random cities at random times in each hour, from the working tree and with the key in `.env`. It is
+`~/Library/LaunchAgents/com.ani.weather-simulator.plist` (`StartInterval` 3600, `RunAtLoad`, `PYTHONUNBUFFERED=1`,
+`WorkingDirectory` the repo root), logging to `~/Library/Logs/weather-simulator.log`, and is not in git.
+* Start: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ani.weather-simulator.plist`
+* Stop: `launchctl bootout gui/$(id -u)/com.ani.weather-simulator`
+* Try a plan without sending: `.venv/bin/python -m src.inference_pipeline.jobs.simulate --max-requests 60 --dry-run`
+
 ## Accepted risks
 * There is only prod, and CI runs unit tests only: new code first meets real Hopsworks in a deploy. The smoke check
   and the predictor's fallback limit the damage.

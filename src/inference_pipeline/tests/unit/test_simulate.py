@@ -76,3 +76,13 @@ def test_a_failed_request_is_a_problem_not_a_crash():
 
 def test_the_contract_check_accepts_a_good_response():
     assert contract_problems(GOOD, "Auckland") == []
+
+
+def test_the_job_plans_up_to_the_cap_it_is_given(capsys):
+    from src.inference_pipeline.jobs.simulate import main
+
+    counts = set()
+    for seed in range(200):
+        assert main(["--seed", str(seed), "--max-requests", "60", "--dry-run"]) == 0
+        counts.add(int(capsys.readouterr().out.split()[0]))
+    assert max(counts) > 10 and max(counts) <= 60
