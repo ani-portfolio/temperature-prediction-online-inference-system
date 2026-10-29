@@ -198,10 +198,14 @@ def _sync_deployment(project, settings, report):
     if report.dry_run:
         report.steps.append(f"deployment {conf.name}: would restart to load the new code")
         return
-    if change.action == "update":
+    if change.action == "update":   # every deploy: Hopsworks keeps only the script's name, so the paths never match
         deployment.script_file = want.script_file
         deployment.environment = want.environment
-        deployment.inference_logger = InferenceLogger()
+        # Keep the log topic: a new one would strand the requests the log job has not read yet
+        logger = deployment.inference_logger
+        topic = logger.kafka_topic.name if logger and logger.kafka_topic else None
+        keep = topic and topic not in ("CREATE", "NONE")
+        deployment.inference_logger = InferenceLogger(kafka_topic={"name": topic}) if keep else InferenceLogger()
         deployment.save()
     deployment.stop()
     deployment.start()

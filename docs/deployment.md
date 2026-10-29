@@ -103,6 +103,11 @@ read from `.env`. Rotating it means updating both: create a new key in Hopsworks
 A spike on 2026-10-23 (a throwaway echo predictor, since deleted) confirmed on Hopsworks Serverless:
 * A deployment created with `inference_logger=InferenceLogger()` logs `ALL` to a Kafka topic made for it
   (`<deployment>-inf<NNNN>`). A plain dict such as `{"mode": "ALL"}` is read as no logging.
+* Saving a deployment with a new `InferenceLogger()` makes a new topic, and the log job reads only the current one, so
+  requests it had not read yet stay behind in the old topic. Hopsworks keeps only the script's file name, so every
+  deploy saves the deployment (which also copies an edited `predictor.py` in); `deploy.apply` passes the current
+  topic's name each time to keep it. Found on 2026-10-29, after five deploys had left five topics
+  (`temperatureforecast-inf3697`, `inf8884`, `inf9490`, `inf4729`, `inf0497`).
 * Each request writes two messages, the request and the response, with the same inference id. Each value is an Avro
   record with no schema registered on the topic, in this field order: modelId (int), modelName (string),
   modelVersion (int), requestTimestamp (long, Unix seconds), responseHttpCode (int), inferenceId (string),
