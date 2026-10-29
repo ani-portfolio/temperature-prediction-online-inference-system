@@ -1,4 +1,4 @@
-"""Simulated traffic for the deployed predictor: random single-city requests at random times, at most 10 an hour.
+"""Simulated traffic for the deployed predictor: random single-city requests at random times, by default at most 10 an hour.
 
 Only requested cities get predictions, so the live gate and monitoring depend on traffic. Every request goes through
 the deployment like a real one, so the inference logger and the log job record it, and the champion and every shadow

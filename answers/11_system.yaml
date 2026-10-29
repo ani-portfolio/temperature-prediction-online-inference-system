@@ -2,10 +2,10 @@
 # script and this file. The notebook's decision cells are the record; the next build replaces this.
 skill: ml-system-design
 stage: system
-saved_at: '2026-10-28T19:43:52'
+saved_at: '2026-10-29T17:08:52'
 command:
   - design.py
-  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_27xvzxd5.yaml
+  - /var/folders/rx/jl4f7yr95xd03cgb4sg2w99h0000gn/T/answers_ej575lxz.yaml
 answers:
   status: confirmed
   platform:
@@ -301,11 +301,11 @@ answers:
       resolution: Accepted by the user; if live MAE drifts from CV, re-fetch history and compare first.
     - problem: Only cities that are requested get predictions, so with light traffic the live Diebold-Mariano test
         may take months to reach significance.
-      resolution: A traffic simulator (.github/workflows/simulate.yml on GitHub Actions) sends 0 to 10 single-city
-        requests in one hour for random cities at random times; about half reach the model and the rest fall in
-        a city's awaiting_today gap. The user chose random traffic over full daily coverage to mimic real use while
-        improvements are built and shadowed, and runs it by hand, one hour per run, so the gate gets data only on
-        days the owner runs it and may still take months.
+      resolution: A traffic simulator (src/inference_pipeline/jobs/simulate.py, run every hour by a launchd agent
+        on the owner's laptop) sends 0 to 60 single-city requests in each hour for random cities at random times;
+        about half reach the model and the rest fall in a city's awaiting_today gap. The user chose random traffic
+        over full daily coverage to mimic real use while improvements are built and shadowed, and runs it locally
+        rather than on GitHub Actions, so the gate gets data only while the laptop is on and online.
     - problem: Looking at the live test repeatedly with no fixed window and promoting at the first significant result
         raises the real false promotion rate above alpha.
       resolution: Accepted by the user, who promotes by hand and can wait for a longer window when the result is
