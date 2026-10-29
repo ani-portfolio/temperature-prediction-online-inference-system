@@ -26,7 +26,9 @@ It never deletes a job (a job in the clone with no settings is reported as `unma
 decides which model serves: the predictor serves the model tagged champion, so promotion stays by hand.
 
 `deploy.smoke` runs the feature job (`feature_pipeline_hourly`, scheduled daily at 12:15 UTC) and checks one forecast
-against the contract in `docs/system_design.md`. While there is no deployment it prints `bootstrap pending` and
+against the contract in `docs/system_design.md`. Seconds after the restart the gateway can answer 503 (no healthy
+upstream) before the predictor is ready, so a 503 is retried once after a minute; any other error fails at once.
+While there is no deployment it prints `bootstrap pending` and
 passes without running anything. It accepts the persistence fallback while no model is tagged champion
 (`fallback_reason: no_champion`); any other fallback right after the feature run is a problem.
 

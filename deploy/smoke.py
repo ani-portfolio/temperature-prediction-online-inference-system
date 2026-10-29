@@ -8,6 +8,7 @@ new project' in docs/deployment.md. Exits 1 on any problem."""
 from __future__ import annotations
 
 import sys
+import time
 
 from deploy.settings import load_settings
 from src import platform
@@ -17,6 +18,7 @@ SMOKE_JOB = "feature_pipeline_hourly"
 PRESENT_JOBS = ("monitoring_pipeline_daily",)   # checked to exist, not run: a run reads and writes every report
 SMOKE_CITY = "Auckland"
 NO_CHAMPION = "no_champion"   # the predictor serves persistence until a model is tagged champion
+RETRY_SECONDS = 60            # the gateway answers 503 until the restarted predictor is ready
 
 
 def contract_problems(response: dict, city: str) -> list[str]:
@@ -26,6 +28,19 @@ def contract_problems(response: dict, city: str) -> list[str]:
     if response.get("fallback_used") and response.get("fallback_reason") != NO_CHAMPION:
         out.append(f"fallback_used is true ({response.get('fallback_reason')}) right after a fresh feature run")
     return out
+
+
+def _forecast(deployment, city: str) -> dict:
+    """One city's prediction. Right after the restart the gateway can answer 503 (no healthy upstream) before the
+    predictor is ready, so a 503 is retried once after RETRY_SECONDS; any other error, or a second 503, raises."""
+    try:
+        return deployment.predict(inputs=[{"city": city}])["predictions"][0]
+    except Exception as e:   # the client raises its own error class, carrying the HTTP response
+        if getattr(getattr(e, "response", None), "status_code", None) != 503:
+            raise
+        print(f"503 from the deployment, retrying in {RETRY_SECONDS}s")
+    time.sleep(RETRY_SECONDS)
+    return deployment.predict(inputs=[{"city": city}])["predictions"][0]
 
 
 def smoke(project=None) -> list[str]:
@@ -51,7 +66,7 @@ def smoke(project=None) -> list[str]:
     if execution.final_status != "SUCCEEDED":
         problems.append(f"job {SMOKE_JOB} ended {execution.final_status}")
     if deployment:
-        response = deployment.predict(inputs=[{"city": SMOKE_CITY}])["predictions"][0]
+        response = _forecast(deployment, SMOKE_CITY)
         problems += contract_problems(response, SMOKE_CITY)
         if response.get("fallback_reason") == NO_CHAMPION:
             print("serving persistence: no model tagged champion")
