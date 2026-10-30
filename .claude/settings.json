@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"/Users/ani/Projects/claude-skills/tools/session_env.py\""
+            "command": "python3 \"/Users/ani/Projects/claude-config/skills/tools/session_env.py\""
           }
         ]
       }
